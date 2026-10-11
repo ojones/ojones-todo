@@ -9,8 +9,28 @@ import { isFeatureEnabled } from "../feature-flags";
 export function todosRouter(store: TodoStore): Router {
   const router = Router();
 
-  router.get("/api/todos", (_req, res) => {
-    res.json(store.list());
+  // Filtering by done is one change, so it sits behind one feature flag
+  // (STANDARDS-FEATURE-FLAGS.md) and stays dark until the Orchestrator
+  // releases it: while the flag is off the route ignores `done` and returns
+  // every todo, exactly as it did before.
+  router.get("/api/todos", async (req, res) => {
+    if (!(await isFeatureEnabled(res, "filter-todos-by-done"))) {
+      res.json(store.list());
+      return;
+    }
+
+    const done = req.query.done;
+    if (done === undefined) {
+      res.json(store.list());
+      return;
+    }
+    if (done !== "true" && done !== "false") {
+      res.status(400).json({ error: "done must be 'true' or 'false'" });
+      return;
+    }
+
+    const wantDone = done === "true";
+    res.json(store.list().filter((todo) => todo.done === wantDone));
   });
 
   router.post("/api/todos", (req, res) => {

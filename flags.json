@@ -1,4 +1,5 @@
 [
   { "slug": "update-todo-store", "description": "TodoStore.update: set a todo's done status by id" },
-  { "slug": "patch-todo-endpoint", "description": "PATCH /api/todos/:id: set a todo's done status" }
+  { "slug": "patch-todo-endpoint", "description": "PATCH /api/todos/:id: set a todo's done status" },
+  { "slug": "filter-todos-by-done", "description": "GET /api/todos: filter todos by done=true/false" }
 ]

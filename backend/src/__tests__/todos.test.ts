@@ -7,7 +7,7 @@ import { OpenFeature, TypedInMemoryProvider } from "@openfeature/server-sdk";
 import { createApp } from "../app";
 
 // Flag keys are scoped by app slug (feature-flags.ts); setup.ts uses "test-app".
-function flags(updateEnabled: boolean, patchEnabled = false) {
+function flags(updateEnabled: boolean, patchEnabled = false, filterEnabled = false) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
@@ -20,6 +20,10 @@ function flags(updateEnabled: boolean, patchEnabled = false) {
     "test-app.feature.patch-todo-endpoint": {
       variants: { on: true, off: false },
       defaultVariant: patchEnabled ? "on" : "off",
+    },
+    "test-app.feature.filter-todos-by-done": {
+      variants: { on: true, off: false },
+      defaultVariant: filterEnabled ? "on" : "off",
     },
   });
 }
@@ -46,6 +50,90 @@ describe("GET /api/todos", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual([{ id: 1, title: "write tests", done: false }]);
+  });
+});
+
+describe("GET /api/todos?done= (filter-todos-by-done flag)", () => {
+  // Seeds one not-done todo (id 1) and one done todo (id 2) with the filter
+  // and patch flags on, so the filter has something to filter.
+  async function seedMixed() {
+    OpenFeature.setProvider(flags(false, true, true));
+    app = createApp();
+    await request(app).post("/api/todos").send({ title: "not done" });
+    await request(app).post("/api/todos").send({ title: "done" });
+    await request(app).patch("/api/todos/2").send({ done: true });
+  }
+
+  it("returns only done todos for ?done=true", async () => {
+    await seedMixed();
+
+    const response = await request(app).get("/api/todos?done=true");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([{ id: 2, title: "done", done: true }]);
+  });
+
+  it("returns only not-done todos for ?done=false", async () => {
+    await seedMixed();
+
+    const response = await request(app).get("/api/todos?done=false");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([{ id: 1, title: "not done", done: false }]);
+  });
+
+  it("returns every todo when done is omitted", async () => {
+    await seedMixed();
+
+    const response = await request(app).get("/api/todos");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([
+      { id: 1, title: "not done", done: false },
+      { id: 2, title: "done", done: true },
+    ]);
+  });
+
+  it.each([["maybe"], ["TRUE"], ["1"], [""]])(
+    "returns 400 with a JSON error for ?done=%s",
+    async (value) => {
+      await seedMixed();
+
+      const response = await request(app).get(`/api/todos?done=${value}`);
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: "done must be 'true' or 'false'" });
+    }
+  );
+
+  it("ignores the done parameter while the flag is off", async () => {
+    OpenFeature.setProvider(flags(false, false, false));
+    app = createApp();
+    await request(app).post("/api/todos").send({ title: "not done" });
+    await request(app).post("/api/todos").send({ title: "done" });
+
+    const filtered = await request(app).get("/api/todos?done=true");
+    expect(filtered.status).toBe(200);
+    expect(filtered.body).toEqual([
+      { id: 1, title: "not done", done: false },
+      { id: 2, title: "done", done: false },
+    ]);
+
+    // An invalid value is not rejected either — the route behaves as before.
+    const invalid = await request(app).get("/api/todos?done=maybe");
+    expect(invalid.status).toBe(200);
+    expect(invalid.body).toHaveLength(2);
+  });
+
+  it("records the filter-todos-by-done flag in flags.json", () => {
+    const list = JSON.parse(
+      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
+    ) as Array<{ slug: string; description: string }>;
+
+    const entry = list.find((f) => f.slug === "filter-todos-by-done");
+
+    expect(entry).toBeTruthy();
+    expect(String(entry?.description).length).toBeGreaterThan(0);
   });
 });
 
