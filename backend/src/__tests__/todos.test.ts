@@ -1,11 +1,27 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
+import { OpenFeature, TypedInMemoryProvider } from "@openfeature/server-sdk";
 import { createApp } from "../app";
+
+// Flag keys are scoped by app slug (feature-flags.ts); setup.ts uses "test-app".
+function flags(updateEnabled: boolean) {
+  return new TypedInMemoryProvider({
+    "test-app.global-kill-switch": {
+      variants: { on: true, off: false },
+      defaultVariant: "on",
+    },
+    "test-app.feature.update-todo-store": {
+      variants: { on: true, off: false },
+      defaultVariant: updateEnabled ? "on" : "off",
+    },
+  });
+}
 
 let app: Express;
 
 beforeEach(() => {
+  OpenFeature.setProvider(flags(false));
   app = createApp();
 });
 
@@ -70,5 +86,72 @@ describe("POST /api/todos", () => {
 
     const list = await request(app).get("/api/todos");
     expect(list.body).toEqual([]);
+  });
+});
+
+describe("PUT /api/todos/:id", () => {
+  it("returns 404 while the update-todo-store flag is off", async () => {
+    OpenFeature.setProvider(flags(false));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app)
+      .put("/api/todos/1")
+      .send({ done: true });
+
+    expect(response.status).toBe(404);
+  });
+
+  it("updates a todo and returns it when the flag is on", async () => {
+    OpenFeature.setProvider(flags(true));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app)
+      .put("/api/todos/1")
+      .send({ done: true });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ id: 1, title: "buy milk", done: true });
+
+    const list = await request(app).get("/api/todos");
+    expect(list.body).toEqual([{ id: 1, title: "buy milk", done: true }]);
+  });
+
+  it("returns 404 for an unknown id when the flag is on", async () => {
+    OpenFeature.setProvider(flags(true));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app)
+      .put("/api/todos/999")
+      .send({ done: true });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "todo not found" });
+
+    const list = await request(app).get("/api/todos");
+    expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
+  });
+
+  it("returns 400 for a non-integer id when the flag is on", async () => {
+    OpenFeature.setProvider(flags(true));
+
+    const response = await request(app)
+      .put("/api/todos/abc")
+      .send({ done: true });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "id must be a positive integer" });
+  });
+
+  it.each([
+    ["a missing done", {}],
+    ["a non-boolean done", { done: "yes" }],
+  ])("returns 400 for %s when the flag is on", async (_label, body) => {
+    OpenFeature.setProvider(flags(true));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app).put("/api/todos/1").send(body);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "done must be a boolean" });
   });
 });
