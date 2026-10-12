@@ -1,7 +1,7 @@
 [
   { "slug": "patch-todo-endpoint", "description": "PATCH /api/todos/:id: set a todo's done status" },
   { "slug": "filter-todos-by-done", "description": "GET /api/todos: filter todos by done=true/false" },
-  { "slug": "delete-todo-endpoint", "description": "DELETE /api/todos/:id: soft-delete a todo (kept for audit, never listed)" },
+  { "slug": "retire-delete-flag", "description": "Retire the delete-todo-endpoint flag: gates DELETE /api/todos/:id so it is always on once released" },
   { "slug": "heartbeat", "description": "GET /api/heartbeat and background logging of one error-level line every 2 seconds" },
   { "slug": "fast-heartbeat", "description": "GET /api/heartbeat/fast and background logging of one error-level line every 1 second (post-release monitoring test)" }
 ]

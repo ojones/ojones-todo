@@ -16,7 +16,7 @@ process.env.APP_SLUG ??= "test-app";
 function flags(
   patchEnabled = false,
   filterEnabled = false,
-  deleteEnabled = false
+  retireEnabled = false
 ) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
@@ -31,9 +31,9 @@ function flags(
       variants: { on: true, off: false },
       defaultVariant: filterEnabled ? "on" : "off",
     },
-    "test-app.feature.delete-todo-endpoint": {
+    "test-app.feature.retire-delete-flag": {
       variants: { on: true, off: false },
-      defaultVariant: deleteEnabled ? "on" : "off",
+      defaultVariant: retireEnabled ? "on" : "off",
     },
   });
 }
@@ -195,7 +195,7 @@ describe("POST /api/todos", () => {
 
 describe("PUT /api/todos/:id", () => {
   it("is always available: updates a todo with every feature flag off", async () => {
-    OpenFeature.setProvider(flags(false, false, false, false));
+    OpenFeature.setProvider(flags(false, false, false));
     app = createApp();
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
@@ -361,9 +361,10 @@ describe("PATCH /api/todos/:id", () => {
   });
 });
 
-describe("DELETE /api/todos/:id", () => {
-  it("returns 404 while the delete-todo-endpoint flag is off", async () => {
+describe("DELETE /api/todos/:id (retire-delete-flag)", () => {
+  it("returns 404 while the retire-delete-flag flag is off", async () => {
     OpenFeature.setProvider(flags(false, false, false));
+    app = createApp();
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).delete("/api/todos/1");
@@ -438,12 +439,12 @@ describe("DELETE /api/todos/:id", () => {
     expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
   });
 
-  it("records the delete-todo-endpoint flag in flags.json", () => {
+  it("records the retire-delete-flag flag in flags.json", () => {
     const list = JSON.parse(
       readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
     ) as Array<{ slug: string; description: string }>;
 
-    const entry = list.find((f) => f.slug === "delete-todo-endpoint");
+    const entry = list.find((f) => f.slug === "retire-delete-flag");
 
     expect(entry).toBeTruthy();
     expect(String(entry?.description).length).toBeGreaterThan(0);
