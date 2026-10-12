@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
@@ -13,15 +11,11 @@ import { createApp } from "../app";
 // suite is self-contained and the result reflects the routes, not the loader.
 process.env.APP_SLUG ??= "test-app";
 
-function flags(patchEnabled = false) {
+function flags() {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
       defaultVariant: "on",
-    },
-    "test-app.feature.patch-todo-endpoint": {
-      variants: { on: true, off: false },
-      defaultVariant: patchEnabled ? "on" : "off",
     },
   });
 }
@@ -52,11 +46,9 @@ describe("GET /api/todos", () => {
 });
 
 describe("GET /api/todos?done=", () => {
-  // Seeds one not-done todo (id 1) and one done todo (id 2) with the patch
-  // flag on, so the filter has something to filter.
+  // Seeds one not-done todo (id 1) and one done todo (id 2), so the filter
+  // has something to filter.
   async function seedMixed() {
-    OpenFeature.setProvider(flags(true));
-    app = createApp();
     await request(app).post("/api/todos").send({ title: "not done" });
     await request(app).post("/api/todos").send({ title: "done" });
     await request(app).patch("/api/todos/2").send({ done: true });
@@ -153,9 +145,7 @@ describe("POST /api/todos", () => {
 });
 
 describe("PUT /api/todos/:id", () => {
-  it("is always available: updates a todo with every feature flag off", async () => {
-    OpenFeature.setProvider(flags(false, false));
-    app = createApp();
+  it("updates a todo to done=true and returns it", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -221,20 +211,7 @@ describe("PUT /api/todos/:id", () => {
 });
 
 describe("PATCH /api/todos/:id", () => {
-  it("returns 404 while the patch-todo-endpoint flag is off", async () => {
-    OpenFeature.setProvider(flags(false));
-    await request(app).post("/api/todos").send({ title: "buy milk" });
-
-    const response = await request(app)
-      .patch("/api/todos/1")
-      .send({ done: true });
-
-    expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "not found" });
-  });
-
-  it("updates a todo to done=true and returns it when the flag is on", async () => {
-    OpenFeature.setProvider(flags(true));
+  it("updates a todo to done=true and returns it", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -248,8 +225,7 @@ describe("PATCH /api/todos/:id", () => {
     expect(list.body).toEqual([{ id: 1, title: "buy milk", done: true }]);
   });
 
-  it("updates a todo to done=false and returns it when the flag is on", async () => {
-    OpenFeature.setProvider(flags(true));
+  it("updates a todo to done=false and returns it", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
     await request(app).patch("/api/todos/1").send({ done: true });
 
@@ -264,8 +240,7 @@ describe("PATCH /api/todos/:id", () => {
     expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
   });
 
-  it("returns 404 for an unknown id when the flag is on", async () => {
-    OpenFeature.setProvider(flags(true));
+  it("returns 404 for an unknown id", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -283,9 +258,7 @@ describe("PATCH /api/todos/:id", () => {
     ["a decimal id", "1.5"],
     ["a negative id", "-1"],
     ["a non-integer id", "abc"],
-  ])("returns 400 for %s when the flag is on", async (_label, id) => {
-    OpenFeature.setProvider(flags(true));
-
+  ])("returns 400 for %s", async (_label, id) => {
     const response = await request(app)
       .patch(`/api/todos/${id}`)
       .send({ done: true });
@@ -298,25 +271,13 @@ describe("PATCH /api/todos/:id", () => {
     ["a missing done", {}],
     ["a non-boolean done", { done: "yes" }],
     ["a numeric done", { done: 1 }],
-  ])("returns 400 for %s when the flag is on", async (_label, body) => {
-    OpenFeature.setProvider(flags(true));
+  ])("returns 400 for %s", async (_label, body) => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).patch("/api/todos/1").send(body);
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "done must be a boolean" });
-  });
-
-  it("records the patch-todo-endpoint flag in flags.json", () => {
-    const list = JSON.parse(
-      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
-    ) as Array<{ slug: string; description: string }>;
-
-    const entry = list.find((f) => f.slug === "patch-todo-endpoint");
-
-    expect(entry).toBeTruthy();
-    expect(String(entry?.description).length).toBeGreaterThan(0);
   });
 });
 

@@ -1,6 +1,5 @@
 import { Router, type RequestHandler } from "express";
 import type { TodoStore } from "../todos";
-import { isFeatureEnabled } from "../feature-flags";
 
 /**
  * Todo API routes. A `TodoStore` is injected so each app instance owns its
@@ -36,12 +35,11 @@ export function todosRouter(store: TodoStore): Router {
     res.status(201).json(store.add(title));
   });
 
-  // update-todo-store is retired: PUT is always available and has no feature
-  // flag gate, so it works regardless of any flag status. PATCH is a separate
-  // change with its own flag, so it still stays dark until the Orchestrator
-  // releases it.
+  // update-todo-store and patch-todo-endpoint are both retired: PUT and PATCH
+  // are always available and have no feature-flag gate, so they work
+  // regardless of any flag status.
   router.put("/api/todos/:id", updateTodoHandler(store));
-  router.patch("/api/todos/:id", updateTodoHandler(store, "patch-todo-endpoint"));
+  router.patch("/api/todos/:id", updateTodoHandler(store));
 
   // delete-todo-endpoint is retired: DELETE is always available and has no
   // feature-flag gate, so it works regardless of any flag status.
@@ -65,16 +63,10 @@ export function todosRouter(store: TodoStore): Router {
 
 /**
  * Builds the handler that sets a todo's done status. Both PUT and PATCH share
- * it. PUT passes no flag slug, so it always runs; PATCH passes its feature-flag
- * slug and answers 404 while that flag is off, exactly as if it did not exist.
+ * it, and neither is feature-flag gated.
  */
-function updateTodoHandler(store: TodoStore, flagSlug?: string): RequestHandler {
+function updateTodoHandler(store: TodoStore): RequestHandler {
   return async (req, res) => {
-    if (flagSlug && !(await isFeatureEnabled(res, flagSlug))) {
-      res.status(404).json({ error: "not found" });
-      return;
-    }
-
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id < 1) {
       res.status(400).json({ error: "id must be a positive integer" });
