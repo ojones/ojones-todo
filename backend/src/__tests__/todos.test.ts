@@ -15,7 +15,7 @@ process.env.APP_SLUG ??= "test-app";
 
 function flags(
   patchEnabled = false,
-  filterEnabled = false,
+  retireFilterEnabled = false,
   retireEnabled = false
 ) {
   return new TypedInMemoryProvider({
@@ -27,9 +27,9 @@ function flags(
       variants: { on: true, off: false },
       defaultVariant: patchEnabled ? "on" : "off",
     },
-    "test-app.feature.filter-todos-by-done": {
+    "test-app.feature.retire-filter-flag": {
       variants: { on: true, off: false },
-      defaultVariant: filterEnabled ? "on" : "off",
+      defaultVariant: retireFilterEnabled ? "on" : "off",
     },
     "test-app.feature.retire-delete-flag": {
       variants: { on: true, off: false },
@@ -63,8 +63,8 @@ describe("GET /api/todos", () => {
   });
 });
 
-describe("GET /api/todos?done= (filter-todos-by-done flag)", () => {
-  // Seeds one not-done todo (id 1) and one done todo (id 2) with the filter
+describe("GET /api/todos?done= (retire-filter-flag)", () => {
+  // Seeds one not-done todo (id 1) and one done todo (id 2) with the retire
   // and patch flags on, so the filter has something to filter.
   async function seedMixed() {
     OpenFeature.setProvider(flags(true, true));
@@ -116,7 +116,7 @@ describe("GET /api/todos?done= (filter-todos-by-done flag)", () => {
     }
   );
 
-  it("ignores the done parameter while the flag is off", async () => {
+  it("ignores the done parameter while retire-filter-flag is off", async () => {
     OpenFeature.setProvider(flags(false, false));
     app = createApp();
     await request(app).post("/api/todos").send({ title: "not done" });
@@ -135,15 +135,16 @@ describe("GET /api/todos?done= (filter-todos-by-done flag)", () => {
     expect(invalid.body).toHaveLength(2);
   });
 
-  it("records the filter-todos-by-done flag in flags.json", () => {
+  it("records retire-filter-flag in flags.json and drops filter-todos-by-done", () => {
     const list = JSON.parse(
       readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
     ) as Array<{ slug: string; description: string }>;
 
-    const entry = list.find((f) => f.slug === "filter-todos-by-done");
+    const entry = list.find((f) => f.slug === "retire-filter-flag");
 
     expect(entry).toBeTruthy();
     expect(String(entry?.description).length).toBeGreaterThan(0);
+    expect(list.find((f) => f.slug === "filter-todos-by-done")).toBeUndefined();
   });
 });
 
