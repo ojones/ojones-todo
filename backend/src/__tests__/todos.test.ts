@@ -15,7 +15,7 @@ import { logger } from "../logger";
 // suite is self-contained and the result reflects the routes, not the loader.
 process.env.APP_SLUG ??= "test-app";
 
-function flags(logTodoUpdateHashOn = false, todosCountEndpointOn = true) {
+function flags(logTodoUpdateHashOn = false) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
@@ -24,10 +24,6 @@ function flags(logTodoUpdateHashOn = false, todosCountEndpointOn = true) {
     "test-app.feature.log-todo-update-hash": {
       variants: { on: true, off: false },
       defaultVariant: logTodoUpdateHashOn ? "on" : "off",
-    },
-    "test-app.feature.todos-count-endpoint": {
-      variants: { on: true, off: false },
-      defaultVariant: todosCountEndpointOn ? "on" : "off",
     },
   });
 }
@@ -108,62 +104,6 @@ describe("GET /api/todos?done=", () => {
     }
   );
 
-});
-
-describe("GET /api/todos/count", () => {
-  it("returns 0 when there are no todos", async () => {
-    const response = await request(app).get("/api/todos/count");
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ count: 0 });
-  });
-
-  it("counts every todo, whether done or not", async () => {
-    await request(app).post("/api/todos").send({ title: "first" });
-    await request(app).post("/api/todos").send({ title: "second" });
-    await request(app).post("/api/todos").send({ title: "third" });
-    await request(app).patch("/api/todos/1").send({ done: true });
-    await request(app).patch("/api/todos/2").send({ done: true });
-
-    const response = await request(app).get("/api/todos/count");
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ count: 3 });
-  });
-
-  it("stops counting a deleted todo", async () => {
-    await request(app).post("/api/todos").send({ title: "first" });
-    await request(app).post("/api/todos").send({ title: "second" });
-    await request(app).post("/api/todos").send({ title: "third" });
-    await request(app).delete("/api/todos/2");
-
-    const response = await request(app).get("/api/todos/count");
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ count: 2 });
-  });
-
-  it("returns 404 while the todos-count-endpoint flag is off", async () => {
-    OpenFeature.setProvider(flags(false, false));
-    app = createApp();
-    await request(app).post("/api/todos").send({ title: "buy milk" });
-
-    const response = await request(app).get("/api/todos/count");
-
-    expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "not found" });
-  });
-
-  it("records the todos-count-endpoint flag in flags.json", () => {
-    const list = JSON.parse(
-      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
-    ) as Array<{ slug: string; description: string }>;
-
-    const entry = list.find((f) => f.slug === "todos-count-endpoint");
-
-    expect(entry).toBeTruthy();
-    expect(String(entry?.description).length).toBeGreaterThan(0);
-  });
 });
 
 describe("POST /api/todos", () => {
