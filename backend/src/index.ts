@@ -1,6 +1,7 @@
 import { createApp } from "./app";
 import { logger } from "./logger";
 import { initFeatureFlags } from "./feature-flags";
+import { startHeartbeatLogging } from "./heartbeat";
 
 /**
  * Required global error handler (STANDARDS-VISIBILITY.md): log the full
@@ -33,6 +34,11 @@ async function main() {
   // The single OpenFeature client is initialized once here, before the
   // server starts accepting requests — not re-derived per route/request.
   await initFeatureFlags();
+
+  // Background heartbeat logging, started when the server starts. It
+  // re-reads the `heartbeat` flag on every tick, so it logs nothing while
+  // the flag is off and stops within one interval once it is turned off.
+  startHeartbeatLogging();
 
   const app = createApp();
 
