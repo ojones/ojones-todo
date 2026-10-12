@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
 import { OpenFeature, TypedInMemoryProvider } from "@openfeature/server-sdk";
 import { createApp } from "../app";
+import { logger } from "../logger";
 
 // Flag keys are scoped by app slug (feature-flags.ts). setup.ts sets this,
 // but it only loads through backend/vitest.config.mts; running vitest from the
@@ -11,11 +15,15 @@ import { createApp } from "../app";
 // suite is self-contained and the result reflects the routes, not the loader.
 process.env.APP_SLUG ??= "test-app";
 
-function flags() {
+function flags(logTodoUpdateHashOn = false) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
       defaultVariant: "on",
+    },
+    "test-app.feature.log-todo-update-hash": {
+      variants: { on: true, off: false },
+      defaultVariant: logTodoUpdateHashOn ? "on" : "off",
     },
   });
 }
@@ -207,6 +215,96 @@ describe("PUT /api/todos/:id", () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "done must be a boolean" });
+  });
+});
+
+describe("PUT /api/todos/:id SHA-256 hash logging", () => {
+  const body = { done: true };
+  const expectedHash = createHash("sha256")
+    .update(JSON.stringify(body))
+    .digest("hex");
+
+  async function seedTodo() {
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+  }
+
+  it("logs the SHA-256 hash of the request body at info level when the flag is on", async () => {
+    OpenFeature.setProvider(flags(true));
+    app = createApp();
+    const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
+    await seedTodo();
+
+    const response = await request(app).put("/api/todos/1").send(body);
+
+    expect(response.status).toBe(200);
+    expect(infoSpy).toHaveBeenCalledWith("todo_update_hash", {
+      id: 1,
+      sha256: expectedHash,
+    });
+  });
+
+  it("does not log the hash while the flag is off", async () => {
+    OpenFeature.setProvider(flags(false));
+    app = createApp();
+    const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
+    await seedTodo();
+
+    const response = await request(app).put("/api/todos/1").send(body);
+
+    expect(response.status).toBe(200);
+    expect(infoSpy).not.toHaveBeenCalledWith("todo_update_hash", expect.anything());
+  });
+
+  it("does not log the hash for an invalid body", async () => {
+    OpenFeature.setProvider(flags(true));
+    app = createApp();
+    const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
+    await seedTodo();
+
+    const response = await request(app)
+      .put("/api/todos/1")
+      .send({ done: "invalid" });
+
+    expect(response.status).toBe(400);
+    expect(infoSpy).not.toHaveBeenCalledWith("todo_update_hash", expect.anything());
+  });
+
+  it("keeps the hash out of the response body and headers", async () => {
+    OpenFeature.setProvider(flags(true));
+    app = createApp();
+    vi.spyOn(logger, "info").mockImplementation(() => {});
+    await seedTodo();
+
+    const response = await request(app).put("/api/todos/1").send(body);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ id: 1, title: "buy milk", done: true });
+    const headerText = JSON.stringify(response.headers).toLowerCase();
+    expect(headerText).not.toContain(expectedHash);
+    expect(JSON.stringify(response.body).toLowerCase()).not.toContain(expectedHash);
+  });
+
+  it("does not log the hash for PATCH requests", async () => {
+    OpenFeature.setProvider(flags(true));
+    app = createApp();
+    const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
+    await seedTodo();
+
+    const response = await request(app).patch("/api/todos/1").send(body);
+
+    expect(response.status).toBe(200);
+    expect(infoSpy).not.toHaveBeenCalledWith("todo_update_hash", expect.anything());
+  });
+
+  it("records the log-todo-update-hash flag in flags.json", () => {
+    const list = JSON.parse(
+      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
+    ) as Array<{ slug: string; description: string }>;
+
+    const entry = list.find((f) => f.slug === "log-todo-update-hash");
+
+    expect(entry).toBeTruthy();
+    expect(String(entry?.description).length).toBeGreaterThan(0);
   });
 });
 

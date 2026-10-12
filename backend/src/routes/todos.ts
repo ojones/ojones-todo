@@ -1,5 +1,11 @@
+import { createHash } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import type { TodoStore } from "../todos";
+import { logger } from "../logger";
+import { isFeatureEnabled } from "../feature-flags";
+
+/** Feature flag gating SHA-256 hash logging for PUT /api/todos/:id. */
+const LOG_TODO_UPDATE_HASH = "log-todo-update-hash";
 
 /**
  * Todo API routes. A `TodoStore` is injected so each app instance owns its
@@ -38,7 +44,11 @@ export function todosRouter(store: TodoStore): Router {
   // update-todo-store and patch-todo-endpoint are both retired: PUT and PATCH
   // are always available and have no feature-flag gate, so they work
   // regardless of any flag status.
-  router.put("/api/todos/:id", updateTodoHandler(store));
+  //
+  // PUT additionally logs the SHA-256 hash of the request body when the
+  // `log-todo-update-hash` flag is on. That flag wraps the whole change and
+  // only affects logging; PATCH is unaffected.
+  router.put("/api/todos/:id", putTodoHandler(store));
   router.patch("/api/todos/:id", updateTodoHandler(store));
 
   // delete-todo-endpoint is retired: DELETE is always available and has no
@@ -59,6 +69,27 @@ export function todosRouter(store: TodoStore): Router {
   });
 
   return router;
+}
+
+/**
+ * PUT /api/todos/:id. Behaves exactly like the shared update handler, and
+ * additionally writes one info-level log line carrying the SHA-256 hash of
+ * the request body when the `log-todo-update-hash` flag is on. The hash is
+ * only ever logged, never returned.
+ */
+function putTodoHandler(store: TodoStore): RequestHandler {
+  const update = updateTodoHandler(store);
+  return async (req, res) => {
+    await update(req, res, () => {});
+    if (res.headersSent && res.statusCode === 200) {
+      if (await isFeatureEnabled(res, LOG_TODO_UPDATE_HASH)) {
+        const hash = createHash("sha256")
+          .update(JSON.stringify(req.body))
+          .digest("hex");
+        logger.info("todo_update_hash", { id: Number(req.params.id), sha256: hash });
+      }
+    }
+  };
 }
 
 /**
