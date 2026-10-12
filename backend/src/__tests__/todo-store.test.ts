@@ -132,3 +132,37 @@ describe("TodoStore.delete", () => {
     ]);
   });
 });
+
+describe("TodoStore.count", () => {
+  it("returns 0 on an empty store", () => {
+    const store = new TodoStore();
+
+    expect(store.count()).toBe(0);
+  });
+
+  it("counts every live todo regardless of done status", () => {
+    const store = new TodoStore();
+    store.add("first");
+    store.add("second");
+    store.update(2, { done: true });
+
+    expect(store.count()).toBe(2);
+  });
+
+  it("excludes soft-deleted todos", () => {
+    const store = new TodoStore();
+    store.add("first");
+    store.add("second");
+    store.delete(1);
+
+    expect(store.count()).toBe(1);
+  });
+
+  it("returns to 0 once every todo is deleted", () => {
+    const store = new TodoStore();
+    store.add("only");
+    store.delete(1);
+
+    expect(store.count()).toBe(0);
+  });
+});
