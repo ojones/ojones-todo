@@ -10,7 +10,8 @@ import { createApp } from "../app";
 function flags(
   patchEnabled = false,
   filterEnabled = false,
-  deleteEnabled = false
+  deleteEnabled = false,
+  retireEnabled = false
 ) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
@@ -28,6 +29,10 @@ function flags(
     "test-app.feature.delete-todo-endpoint": {
       variants: { on: true, off: false },
       defaultVariant: deleteEnabled ? "on" : "off",
+    },
+    "test-app.feature.retire-update-todo-store-flag": {
+      variants: { on: true, off: false },
+      defaultVariant: retireEnabled ? "on" : "off",
     },
   });
 }
@@ -187,8 +192,27 @@ describe("POST /api/todos", () => {
   });
 });
 
-describe("PUT /api/todos/:id (always on; update-todo-store flag retired)", () => {
-  it("updates a todo and returns it without any feature flag set", async () => {
+describe("PUT /api/todos/:id (retire-update-todo-store-flag)", () => {
+  it("returns 404 while the retire-update-todo-store-flag flag is off", async () => {
+    OpenFeature.setProvider(flags(false, false, false, false));
+    app = createApp();
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app)
+      .put("/api/todos/1")
+      .send({ done: true });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "not found" });
+
+    // The todo is untouched: it is still listed as not done.
+    const list = await request(app).get("/api/todos");
+    expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
+  });
+
+  it("updates a todo and returns it when the flag is on", async () => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    app = createApp();
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -202,7 +226,9 @@ describe("PUT /api/todos/:id (always on; update-todo-store flag retired)", () =>
     expect(list.body).toEqual([{ id: 1, title: "buy milk", done: true }]);
   });
 
-  it("returns 404 for an unknown id", async () => {
+  it("returns 404 for an unknown id when the flag is on", async () => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    app = createApp();
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -216,7 +242,10 @@ describe("PUT /api/todos/:id (always on; update-todo-store flag retired)", () =>
     expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
   });
 
-  it("returns 400 for a non-integer id", async () => {
+  it("returns 400 for a non-integer id when the flag is on", async () => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    app = createApp();
+
     const response = await request(app)
       .put("/api/todos/abc")
       .send({ done: true });
@@ -228,13 +257,26 @@ describe("PUT /api/todos/:id (always on; update-todo-store flag retired)", () =>
   it.each([
     ["a missing done", {}],
     ["a non-boolean done", { done: "yes" }],
-  ])("returns 400 for %s", async (_label, body) => {
+  ])("returns 400 for %s when the flag is on", async (_label, body) => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    app = createApp();
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).put("/api/todos/1").send(body);
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "done must be a boolean" });
+  });
+
+  it("records the retire-update-todo-store-flag flag in flags.json", () => {
+    const list = JSON.parse(
+      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
+    ) as Array<{ slug: string; description: string }>;
+
+    const entry = list.find((f) => f.slug === "retire-update-todo-store-flag");
+
+    expect(entry).toBeTruthy();
+    expect(String(entry?.description).length).toBeGreaterThan(0);
   });
 });
 
