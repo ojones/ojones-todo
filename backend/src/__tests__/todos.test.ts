@@ -7,7 +7,12 @@ import { OpenFeature, TypedInMemoryProvider } from "@openfeature/server-sdk";
 import { createApp } from "../app";
 
 // Flag keys are scoped by app slug (feature-flags.ts); setup.ts uses "test-app".
-function flags(updateEnabled: boolean, patchEnabled = false, filterEnabled = false) {
+function flags(
+  updateEnabled: boolean,
+  patchEnabled = false,
+  filterEnabled = false,
+  deleteEnabled = false
+) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
@@ -24,6 +29,10 @@ function flags(updateEnabled: boolean, patchEnabled = false, filterEnabled = fal
     "test-app.feature.filter-todos-by-done": {
       variants: { on: true, off: false },
       defaultVariant: filterEnabled ? "on" : "off",
+    },
+    "test-app.feature.delete-todo-endpoint": {
+      variants: { on: true, off: false },
+      defaultVariant: deleteEnabled ? "on" : "off",
     },
   });
 }
@@ -344,6 +353,95 @@ describe("PATCH /api/todos/:id", () => {
     ) as Array<{ slug: string; description: string }>;
 
     const entry = list.find((f) => f.slug === "patch-todo-endpoint");
+
+    expect(entry).toBeTruthy();
+    expect(String(entry?.description).length).toBeGreaterThan(0);
+  });
+});
+
+describe("DELETE /api/todos/:id", () => {
+  it("returns 404 while the delete-todo-endpoint flag is off", async () => {
+    OpenFeature.setProvider(flags(false, false, false, false));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app).delete("/api/todos/1");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "not found" });
+
+    // The todo is untouched: it is still listed.
+    const list = await request(app).get("/api/todos");
+    expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
+  });
+
+  it("deletes a todo with 204 and no body when the flag is on", async () => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app).delete("/api/todos/1");
+
+    expect(response.status).toBe(204);
+    expect(response.body).toEqual({});
+  });
+
+  it("omits a deleted todo from GET /api/todos", async () => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    await request(app).post("/api/todos").send({ title: "first" });
+    await request(app).post("/api/todos").send({ title: "second" });
+
+    await request(app).delete("/api/todos/1");
+
+    const list = await request(app).get("/api/todos");
+    expect(list.status).toBe(200);
+    expect(list.body).toEqual([{ id: 2, title: "second", done: false }]);
+  });
+
+  it("returns 404 for an unknown id when the flag is on", async () => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app).delete("/api/todos/999");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "todo not found" });
+  });
+
+  it("returns 404 when deleting an already-deleted todo", async () => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+    await request(app).delete("/api/todos/1");
+
+    const response = await request(app).delete("/api/todos/1");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "todo not found" });
+  });
+
+  it.each([
+    ["a decimal id", "1.5"],
+    ["a negative id", "-1"],
+    ["a non-integer id", "abc"],
+    ["zero", "0"],
+  ])("returns 400 for %s when the flag is on", async (_label, id) => {
+    OpenFeature.setProvider(flags(false, false, false, true));
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app).delete(`/api/todos/${id}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "id must be a positive integer" });
+
+    // An invalid id must not delete the valid todo.
+    const list = await request(app).get("/api/todos");
+    expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
+  });
+
+  it("records the delete-todo-endpoint flag in flags.json", () => {
+    const list = JSON.parse(
+      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
+    ) as Array<{ slug: string; description: string }>;
+
+    const entry = list.find((f) => f.slug === "delete-todo-endpoint");
 
     expect(entry).toBeTruthy();
     expect(String(entry?.description).length).toBeGreaterThan(0);

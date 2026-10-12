@@ -14,10 +14,34 @@ export interface Todo {
  */
 export class TodoStore {
   private readonly todos: Todo[] = [];
+  private readonly deletedIds = new Set<number>();
   private nextId = 1;
 
+  /** Live todos only — soft-deleted ones are kept but never listed. */
   list(): Todo[] {
-    return this.todos;
+    return this.todos.filter((t) => !this.deletedIds.has(t.id));
+  }
+
+  /**
+   * Soft-deletes a todo: it stops appearing in list() and the API, but the
+   * record stays in the store for audit/history. Returns `false` when no live
+   * todo has that id (unknown, or already deleted).
+   */
+  delete(id: number): boolean {
+    const todo = this.todos.find((t) => t.id === id);
+    if (!todo || this.deletedIds.has(id)) {
+      return false;
+    }
+    this.deletedIds.add(id);
+    return true;
+  }
+
+  /**
+   * Every soft-deleted todo still on record, for audit/history. There is no
+   * API route for this and no way to recover a deleted todo.
+   */
+  listDeleted(): Todo[] {
+    return this.todos.filter((t) => this.deletedIds.has(t.id));
   }
 
   add(title: string): Todo {

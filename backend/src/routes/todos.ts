@@ -49,6 +49,29 @@ export function todosRouter(store: TodoStore): Router {
   router.put("/api/todos/:id", updateTodoHandler(store, "update-todo-store"));
   router.patch("/api/todos/:id", updateTodoHandler(store, "patch-todo-endpoint"));
 
+  // Soft-deletes a todo. Behind its own feature flag (STANDARDS-FEATURE-FLAGS.md)
+  // and dark until the Orchestrator releases it: while the flag is off the
+  // route answers 404, exactly as if it did not exist.
+  router.delete("/api/todos/:id", async (req, res) => {
+    if (!(await isFeatureEnabled(res, "delete-todo-endpoint"))) {
+      res.status(404).json({ error: "not found" });
+      return;
+    }
+
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1) {
+      res.status(400).json({ error: "id must be a positive integer" });
+      return;
+    }
+
+    if (!store.delete(id)) {
+      res.status(404).json({ error: "todo not found" });
+      return;
+    }
+
+    res.status(204).end();
+  });
+
   return router;
 }
 
