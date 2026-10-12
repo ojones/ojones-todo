@@ -13,11 +13,7 @@ import { createApp } from "../app";
 // suite is self-contained and the result reflects the routes, not the loader.
 process.env.APP_SLUG ??= "test-app";
 
-function flags(
-  patchEnabled = false,
-  filterEnabled = false,
-  retireEnabled = false
-) {
+function flags(patchEnabled = false, filterEnabled = false) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
@@ -30,10 +26,6 @@ function flags(
     "test-app.feature.filter-todos-by-done": {
       variants: { on: true, off: false },
       defaultVariant: filterEnabled ? "on" : "off",
-    },
-    "test-app.feature.retire-delete-flag": {
-      variants: { on: true, off: false },
-      defaultVariant: retireEnabled ? "on" : "off",
     },
   });
 }
@@ -195,7 +187,7 @@ describe("POST /api/todos", () => {
 
 describe("PUT /api/todos/:id", () => {
   it("is always available: updates a todo with every feature flag off", async () => {
-    OpenFeature.setProvider(flags(false, false, false));
+    OpenFeature.setProvider(flags(false, false));
     app = createApp();
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
@@ -361,34 +353,23 @@ describe("PATCH /api/todos/:id", () => {
   });
 });
 
-describe("DELETE /api/todos/:id (retire-delete-flag)", () => {
-  it("returns 404 while the retire-delete-flag flag is off", async () => {
-    OpenFeature.setProvider(flags(false, false, false));
+describe("DELETE /api/todos/:id (delete-todo-endpoint retired)", () => {
+  it("is always available: deletes a todo with every feature flag off", async () => {
+    OpenFeature.setProvider(flags(false, false));
     app = createApp();
-    await request(app).post("/api/todos").send({ title: "buy milk" });
-
-    const response = await request(app).delete("/api/todos/1");
-
-    expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "not found" });
-
-    // The todo is untouched: it is still listed.
-    const list = await request(app).get("/api/todos");
-    expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
-  });
-
-  it("deletes a todo with 204 and no body when the flag is on", async () => {
-    OpenFeature.setProvider(flags(false, false, true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).delete("/api/todos/1");
 
     expect(response.status).toBe(204);
     expect(response.body).toEqual({});
+
+    // The todo is gone: GET no longer lists it.
+    const list = await request(app).get("/api/todos");
+    expect(list.body).toEqual([]);
   });
 
   it("omits a deleted todo from GET /api/todos", async () => {
-    OpenFeature.setProvider(flags(false, false, true));
     await request(app).post("/api/todos").send({ title: "first" });
     await request(app).post("/api/todos").send({ title: "second" });
 
@@ -399,8 +380,7 @@ describe("DELETE /api/todos/:id (retire-delete-flag)", () => {
     expect(list.body).toEqual([{ id: 2, title: "second", done: false }]);
   });
 
-  it("returns 404 for an unknown id when the flag is on", async () => {
-    OpenFeature.setProvider(flags(false, false, true));
+  it("returns 404 for an unknown id", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).delete("/api/todos/999");
@@ -410,7 +390,6 @@ describe("DELETE /api/todos/:id (retire-delete-flag)", () => {
   });
 
   it("returns 404 when deleting an already-deleted todo", async () => {
-    OpenFeature.setProvider(flags(false, false, true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
     await request(app).delete("/api/todos/1");
 
@@ -425,8 +404,7 @@ describe("DELETE /api/todos/:id (retire-delete-flag)", () => {
     ["a negative id", "-1"],
     ["a non-integer id", "abc"],
     ["zero", "0"],
-  ])("returns 400 for %s when the flag is on", async (_label, id) => {
-    OpenFeature.setProvider(flags(false, false, true));
+  ])("returns 400 for %s", async (_label, id) => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).delete(`/api/todos/${id}`);
@@ -439,14 +417,12 @@ describe("DELETE /api/todos/:id (retire-delete-flag)", () => {
     expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
   });
 
-  it("records the retire-delete-flag flag in flags.json", () => {
+  it("no longer records delete-todo-endpoint or retire-delete-flag in flags.json", () => {
     const list = JSON.parse(
       readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
     ) as Array<{ slug: string; description: string }>;
 
-    const entry = list.find((f) => f.slug === "retire-delete-flag");
-
-    expect(entry).toBeTruthy();
-    expect(String(entry?.description).length).toBeGreaterThan(0);
+    expect(list.find((f) => f.slug === "delete-todo-endpoint")).toBeUndefined();
+    expect(list.find((f) => f.slug === "retire-delete-flag")).toBeUndefined();
   });
 });
