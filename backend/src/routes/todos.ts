@@ -51,17 +51,9 @@ export function todosRouter(store: TodoStore): Router {
   router.put("/api/todos/:id", updateTodoHandler(store));
   router.patch("/api/todos/:id", updateTodoHandler(store, "patch-todo-endpoint"));
 
-  // Retiring delete-todo-endpoint so DELETE is always on is one change, so the
-  // whole change sits behind one feature flag (STANDARDS-FEATURE-FLAGS.md) and
-  // stays dark until the Orchestrator releases it: while the flag is off the
-  // route answers 404, exactly as if it did not exist. Once released, DELETE
-  // answers exactly as it did when delete-todo-endpoint was on.
-  router.delete("/api/todos/:id", async (req, res) => {
-    if (!(await isFeatureEnabled(res, "retire-delete-flag"))) {
-      res.status(404).json({ error: "not found" });
-      return;
-    }
-
+  // delete-todo-endpoint is retired: DELETE is always available and has no
+  // feature-flag gate, so it works regardless of any flag status.
+  router.delete("/api/todos/:id", (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id < 1) {
       res.status(400).json({ error: "id must be a positive integer" });
