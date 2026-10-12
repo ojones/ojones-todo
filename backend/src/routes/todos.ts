@@ -7,6 +7,9 @@ import { isFeatureEnabled } from "../feature-flags";
 /** Feature flag gating SHA-256 hash logging for PUT /api/todos/:id. */
 const LOG_TODO_UPDATE_HASH = "log-todo-update-hash";
 
+/** Feature flag gating GET /api/todos/count. */
+const TODOS_COUNT = "todos-count";
+
 /**
  * Todo API routes. A `TodoStore` is injected so each app instance owns its
  * own in-memory state.
@@ -30,6 +33,18 @@ export function todosRouter(store: TodoStore): Router {
 
     const wantDone = done === "true";
     res.json(store.list().filter((todo) => todo.done === wantDone));
+  });
+
+  // GET /api/todos/count is gated by the `todos-count` flag: it ships dark
+  // and behaves as an unknown route (404) until the Orchestrator releases it.
+  // Registered before the POST route so the literal path can never collide
+  // with a `/api/todos/:id`-style match.
+  router.get("/api/todos/count", async (req, res) => {
+    if (!(await isFeatureEnabled(res, TODOS_COUNT))) {
+      res.status(404).json({ error: "not found" });
+      return;
+    }
+    res.json({ count: store.count() });
   });
 
   router.post("/api/todos", (req, res) => {

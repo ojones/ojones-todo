@@ -132,3 +132,31 @@ describe("TodoStore.delete", () => {
     ]);
   });
 });
+
+describe("TodoStore.count", () => {
+  it("returns 0 on an empty store", () => {
+    const store = new TodoStore();
+
+    expect(store.count()).toBe(0);
+  });
+
+  it("counts every todo regardless of done status", () => {
+    const store = new TodoStore();
+    store.add("first");
+    store.add("second");
+    store.update(2, { done: true });
+
+    expect(store.count()).toBe(2);
+  });
+
+  it("counts soft-deleted todos too", () => {
+    const store = new TodoStore();
+    store.add("first");
+    store.add("second");
+    store.delete(1);
+
+    // list() drops the deleted todo, but the count still includes it.
+    expect(store.list()).toHaveLength(1);
+    expect(store.count()).toBe(2);
+  });
+});
