@@ -1,7 +1,7 @@
 import { createApp } from "./app";
 import { logger } from "./logger";
 import { initFeatureFlags } from "./feature-flags";
-import { startHeartbeatLogging } from "./heartbeat";
+import { startFastHeartbeatLogging, startHeartbeatLogging } from "./heartbeat";
 
 /**
  * Required global error handler (STANDARDS-VISIBILITY.md): log the full
@@ -39,6 +39,11 @@ async function main() {
   // re-reads the `heartbeat` flag on every tick, so it logs nothing while
   // the flag is off and stops within one interval once it is turned off.
   startHeartbeatLogging();
+
+  // Fast heartbeat logging, independent of the timer above. It re-reads the
+  // `fast-heartbeat` flag on every tick, so it logs nothing while the flag is
+  // off and stops within one second once it is turned off.
+  startFastHeartbeatLogging();
 
   const app = createApp();
 
