@@ -6,7 +6,13 @@ import type { Express } from "express";
 import { OpenFeature, TypedInMemoryProvider } from "@openfeature/server-sdk";
 import { createApp } from "../app";
 
-// Flag keys are scoped by app slug (feature-flags.ts); setup.ts uses "test-app".
+// Flag keys are scoped by app slug (feature-flags.ts). setup.ts sets this,
+// but it only loads through backend/vitest.config.mts; running vitest from the
+// repo root (e.g. `npx vitest run backend/src/__tests__/todos.test.ts`) skips
+// that config, appSlug() throws, and every route 500s. Default it here so the
+// suite is self-contained and the result reflects the routes, not the loader.
+process.env.APP_SLUG ??= "test-app";
+
 function flags(
   patchEnabled = false,
   filterEnabled = false,
