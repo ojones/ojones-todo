@@ -61,39 +61,6 @@ describe("TodoStore.update", () => {
   });
 });
 
-describe("TodoStore.count", () => {
-  it("returns 0 on an empty store", () => {
-    expect(new TodoStore().count()).toBe(0);
-  });
-
-  it("counts both done and not-done todos", () => {
-    const store = new TodoStore();
-    store.add("not done");
-    store.add("done");
-    store.update(2, { done: true });
-
-    expect(store.count()).toBe(2);
-  });
-
-  it("excludes soft-deleted todos", () => {
-    const store = new TodoStore();
-    store.add("first");
-    store.add("second");
-    store.delete(1);
-
-    expect(store.count()).toBe(1);
-    expect(store.count()).toBe(store.list().length);
-  });
-
-  it("returns 0 when every todo is deleted", () => {
-    const store = new TodoStore();
-    store.add("only");
-    store.delete(1);
-
-    expect(store.count()).toBe(0);
-  });
-});
-
 describe("TodoStore.delete", () => {
   it("returns true for a live todo and removes it from list()", () => {
     const store = new TodoStore();

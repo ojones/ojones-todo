@@ -23,14 +23,6 @@ export class TodoStore {
   }
 
   /**
-   * Number of live todos, counting both done and not-done. Derived from
-   * list(), so soft-deleted todos are excluded, consistent with the API.
-   */
-  count(): number {
-    return this.list().length;
-  }
-
-  /**
    * Soft-deletes a todo: it stops appearing in list() and the API, but the
    * record stays in the store for audit/history. Returns `false` when no live
    * todo has that id (unknown, or already deleted).
