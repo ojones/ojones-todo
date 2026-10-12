@@ -1,6 +1,5 @@
 [
   { "slug": "heartbeat", "description": "GET /api/heartbeat and background logging of one error-level line every 2 seconds" },
   { "slug": "fast-heartbeat", "description": "GET /api/heartbeat/fast and background logging of one error-level line every 1 second (post-release monitoring test)" },
-  { "slug": "log-todo-update-hash", "description": "PUT /api/todos/:id logs one info-level line with the SHA-256 hash of the request body" },
-  { "slug": "todos-count", "description": "GET /api/todos/count returns {\"count\": N}, the total number of todos including done and soft-deleted ones" }
+  { "slug": "log-todo-update-hash", "description": "PUT /api/todos/:id logs one info-level line with the SHA-256 hash of the request body" }
 ]
