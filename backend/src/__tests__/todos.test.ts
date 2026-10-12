@@ -8,7 +8,6 @@ import { createApp } from "../app";
 
 // Flag keys are scoped by app slug (feature-flags.ts); setup.ts uses "test-app".
 function flags(
-  updateEnabled: boolean,
   patchEnabled = false,
   filterEnabled = false,
   deleteEnabled = false
@@ -17,10 +16,6 @@ function flags(
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
       defaultVariant: "on",
-    },
-    "test-app.feature.update-todo-store": {
-      variants: { on: true, off: false },
-      defaultVariant: updateEnabled ? "on" : "off",
     },
     "test-app.feature.patch-todo-endpoint": {
       variants: { on: true, off: false },
@@ -40,7 +35,7 @@ function flags(
 let app: Express;
 
 beforeEach(() => {
-  OpenFeature.setProvider(flags(false));
+  OpenFeature.setProvider(flags());
   app = createApp();
 });
 
@@ -66,7 +61,7 @@ describe("GET /api/todos?done= (filter-todos-by-done flag)", () => {
   // Seeds one not-done todo (id 1) and one done todo (id 2) with the filter
   // and patch flags on, so the filter has something to filter.
   async function seedMixed() {
-    OpenFeature.setProvider(flags(false, true, true));
+    OpenFeature.setProvider(flags(true, true));
     app = createApp();
     await request(app).post("/api/todos").send({ title: "not done" });
     await request(app).post("/api/todos").send({ title: "done" });
@@ -116,7 +111,7 @@ describe("GET /api/todos?done= (filter-todos-by-done flag)", () => {
   );
 
   it("ignores the done parameter while the flag is off", async () => {
-    OpenFeature.setProvider(flags(false, false, false));
+    OpenFeature.setProvider(flags(false, false));
     app = createApp();
     await request(app).post("/api/todos").send({ title: "not done" });
     await request(app).post("/api/todos").send({ title: "done" });
@@ -192,20 +187,8 @@ describe("POST /api/todos", () => {
   });
 });
 
-describe("PUT /api/todos/:id", () => {
-  it("returns 404 while the update-todo-store flag is off", async () => {
-    OpenFeature.setProvider(flags(false));
-    await request(app).post("/api/todos").send({ title: "buy milk" });
-
-    const response = await request(app)
-      .put("/api/todos/1")
-      .send({ done: true });
-
-    expect(response.status).toBe(404);
-  });
-
-  it("updates a todo and returns it when the flag is on", async () => {
-    OpenFeature.setProvider(flags(true));
+describe("PUT /api/todos/:id (always on; update-todo-store flag retired)", () => {
+  it("updates a todo and returns it without any feature flag set", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -219,8 +202,7 @@ describe("PUT /api/todos/:id", () => {
     expect(list.body).toEqual([{ id: 1, title: "buy milk", done: true }]);
   });
 
-  it("returns 404 for an unknown id when the flag is on", async () => {
-    OpenFeature.setProvider(flags(true));
+  it("returns 404 for an unknown id", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -234,9 +216,7 @@ describe("PUT /api/todos/:id", () => {
     expect(list.body).toEqual([{ id: 1, title: "buy milk", done: false }]);
   });
 
-  it("returns 400 for a non-integer id when the flag is on", async () => {
-    OpenFeature.setProvider(flags(true));
-
+  it("returns 400 for a non-integer id", async () => {
     const response = await request(app)
       .put("/api/todos/abc")
       .send({ done: true });
@@ -248,8 +228,7 @@ describe("PUT /api/todos/:id", () => {
   it.each([
     ["a missing done", {}],
     ["a non-boolean done", { done: "yes" }],
-  ])("returns 400 for %s when the flag is on", async (_label, body) => {
-    OpenFeature.setProvider(flags(true));
+  ])("returns 400 for %s", async (_label, body) => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).put("/api/todos/1").send(body);
@@ -259,9 +238,9 @@ describe("PUT /api/todos/:id", () => {
   });
 });
 
-describe("PATCH /api/todos/:id", () => {
+  describe("PATCH /api/todos/:id", () => {
   it("returns 404 while the patch-todo-endpoint flag is off", async () => {
-    OpenFeature.setProvider(flags(false, false));
+    OpenFeature.setProvider(flags(false));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -273,7 +252,7 @@ describe("PATCH /api/todos/:id", () => {
   });
 
   it("updates a todo to done=true and returns it when the flag is on", async () => {
-    OpenFeature.setProvider(flags(false, true));
+    OpenFeature.setProvider(flags(true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -288,7 +267,7 @@ describe("PATCH /api/todos/:id", () => {
   });
 
   it("updates a todo to done=false and returns it when the flag is on", async () => {
-    OpenFeature.setProvider(flags(false, true));
+    OpenFeature.setProvider(flags(true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
     await request(app).patch("/api/todos/1").send({ done: true });
 
@@ -304,7 +283,7 @@ describe("PATCH /api/todos/:id", () => {
   });
 
   it("returns 404 for an unknown id when the flag is on", async () => {
-    OpenFeature.setProvider(flags(false, true));
+    OpenFeature.setProvider(flags(true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app)
@@ -323,7 +302,7 @@ describe("PATCH /api/todos/:id", () => {
     ["a negative id", "-1"],
     ["a non-integer id", "abc"],
   ])("returns 400 for %s when the flag is on", async (_label, id) => {
-    OpenFeature.setProvider(flags(false, true));
+    OpenFeature.setProvider(flags(true));
 
     const response = await request(app)
       .patch(`/api/todos/${id}`)
@@ -338,7 +317,7 @@ describe("PATCH /api/todos/:id", () => {
     ["a non-boolean done", { done: "yes" }],
     ["a numeric done", { done: 1 }],
   ])("returns 400 for %s when the flag is on", async (_label, body) => {
-    OpenFeature.setProvider(flags(false, true));
+    OpenFeature.setProvider(flags(true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).patch("/api/todos/1").send(body);
@@ -361,7 +340,7 @@ describe("PATCH /api/todos/:id", () => {
 
 describe("DELETE /api/todos/:id", () => {
   it("returns 404 while the delete-todo-endpoint flag is off", async () => {
-    OpenFeature.setProvider(flags(false, false, false, false));
+    OpenFeature.setProvider(flags(false, false, false));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).delete("/api/todos/1");
@@ -375,7 +354,7 @@ describe("DELETE /api/todos/:id", () => {
   });
 
   it("deletes a todo with 204 and no body when the flag is on", async () => {
-    OpenFeature.setProvider(flags(false, false, false, true));
+    OpenFeature.setProvider(flags(false, false, true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).delete("/api/todos/1");
@@ -385,7 +364,7 @@ describe("DELETE /api/todos/:id", () => {
   });
 
   it("omits a deleted todo from GET /api/todos", async () => {
-    OpenFeature.setProvider(flags(false, false, false, true));
+    OpenFeature.setProvider(flags(false, false, true));
     await request(app).post("/api/todos").send({ title: "first" });
     await request(app).post("/api/todos").send({ title: "second" });
 
@@ -397,7 +376,7 @@ describe("DELETE /api/todos/:id", () => {
   });
 
   it("returns 404 for an unknown id when the flag is on", async () => {
-    OpenFeature.setProvider(flags(false, false, false, true));
+    OpenFeature.setProvider(flags(false, false, true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).delete("/api/todos/999");
@@ -407,7 +386,7 @@ describe("DELETE /api/todos/:id", () => {
   });
 
   it("returns 404 when deleting an already-deleted todo", async () => {
-    OpenFeature.setProvider(flags(false, false, false, true));
+    OpenFeature.setProvider(flags(false, false, true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
     await request(app).delete("/api/todos/1");
 
@@ -423,7 +402,7 @@ describe("DELETE /api/todos/:id", () => {
     ["a non-integer id", "abc"],
     ["zero", "0"],
   ])("returns 400 for %s when the flag is on", async (_label, id) => {
-    OpenFeature.setProvider(flags(false, false, false, true));
+    OpenFeature.setProvider(flags(false, false, true));
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
     const response = await request(app).delete(`/api/todos/${id}`);

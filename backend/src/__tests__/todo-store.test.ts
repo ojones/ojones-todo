@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { TodoStore } from "../todos";
 
@@ -60,19 +58,6 @@ describe("TodoStore.update", () => {
 
     expect(store.update(1, { done: true })).toBeNull();
     expect(store.list()).toEqual([]);
-  });
-});
-
-describe("update-todo-store flag", () => {
-  it("is recorded in flags.json with a description", () => {
-    const list = JSON.parse(
-      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
-    ) as Array<{ slug: string; description: string }>;
-
-    const entry = list.find((f) => f.slug === "update-todo-store");
-
-    expect(entry).toBeTruthy();
-    expect(String(entry?.description).length).toBeGreaterThan(0);
   });
 });
 

@@ -1,5 +1,5 @@
 [
-  { "slug": "update-todo-store", "description": "TodoStore.update: set a todo's done status by id" },
+  { "slug": "retire-update-todo-store-flag", "description": "Retire the update-todo-store flag: PUT /api/todos/:id is now always on" },
   { "slug": "patch-todo-endpoint", "description": "PATCH /api/todos/:id: set a todo's done status" },
   { "slug": "filter-todos-by-done", "description": "GET /api/todos: filter todos by done=true/false" },
   { "slug": "delete-todo-endpoint", "description": "DELETE /api/todos/:id: soft-delete a todo (kept for audit, never listed)" },

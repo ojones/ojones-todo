@@ -42,11 +42,11 @@ export function todosRouter(store: TodoStore): Router {
     res.status(201).json(store.add(title));
   });
 
-  // Sets a todo's done status. Each route is behind its own feature flag
-  // (STANDARDS-FEATURE-FLAGS.md) and stays dark until the Orchestrator
-  // releases it: while the flag is off the route answers 404, exactly as if
-  // it did not exist.
-  router.put("/api/todos/:id", updateTodoHandler(store, "update-todo-store"));
+  // PUT is ungated: its update-todo-store flag was retired and is always on
+  // now, so the route is always available. PATCH is a separate change and
+  // stays behind its own feature flag (STANDARDS-FEATURE-FLAGS.md): while
+  // that flag is off the route answers 404, exactly as if it did not exist.
+  router.put("/api/todos/:id", updateTodoHandler(store));
   router.patch("/api/todos/:id", updateTodoHandler(store, "patch-todo-endpoint"));
 
   // Soft-deletes a todo. Behind its own feature flag (STANDARDS-FEATURE-FLAGS.md)
@@ -77,11 +77,12 @@ export function todosRouter(store: TodoStore): Router {
 
 /**
  * Builds the handler that sets a todo's done status. Both PUT and PATCH share
- * it; each route supplies the feature-flag slug that gates it.
+ * it. PUT is ungated; PATCH passes its feature-flag slug, and while that flag
+ * is off the route answers 404, exactly as if it did not exist.
  */
-function updateTodoHandler(store: TodoStore, flagSlug: string): RequestHandler {
+function updateTodoHandler(store: TodoStore, flagSlug?: string): RequestHandler {
   return async (req, res) => {
-    if (!(await isFeatureEnabled(res, flagSlug))) {
+    if (flagSlug !== undefined && !(await isFeatureEnabled(res, flagSlug))) {
       res.status(404).json({ error: "not found" });
       return;
     }
