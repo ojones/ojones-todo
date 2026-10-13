@@ -96,18 +96,14 @@ describe("GET /api/todos?done=", () => {
     ]);
   });
 
-  it.each([["maybe"], ["TRUE"], ["1"], [""]])(
-    "returns 400 with a JSON error for ?done=%s",
-    async (value) => {
-      await seedMixed();
+  it.each([["maybe"], ["TRUE"], ["1"], [""]])("returns 400 with a JSON error for ?done=%s", async (value) => {
+    await seedMixed();
 
-      const response = await request(app).get(`/api/todos?done=${value}`);
+    const response = await request(app).get(`/api/todos?done=${value}`);
 
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: "done must be 'true' or 'false'" });
-    }
-  );
-
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "done must be 'true' or 'false'" });
+  });
 });
 
 describe("GET /api/todos/count", () => {
@@ -155,9 +151,10 @@ describe("GET /api/todos/count", () => {
   });
 
   it("records the todos-count-endpoint flag in flags.json", () => {
-    const list = JSON.parse(
-      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
-    ) as Array<{ slug: string; description: string }>;
+    const list = JSON.parse(readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")) as Array<{
+      slug: string;
+      description: string;
+    }>;
 
     const entry = list.find((f) => f.slug === "todos-count-endpoint");
 
@@ -168,9 +165,7 @@ describe("GET /api/todos/count", () => {
 
 describe("POST /api/todos", () => {
   it("creates a todo and returns it with 201", async () => {
-    const response = await request(app)
-      .post("/api/todos")
-      .send({ title: "buy milk" });
+    const response = await request(app).post("/api/todos").send({ title: "buy milk" });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ id: 1, title: "buy milk", done: false });
@@ -216,9 +211,7 @@ describe("PUT /api/todos/:id", () => {
   it("updates a todo to done=true and returns it", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
-    const response = await request(app)
-      .put("/api/todos/1")
-      .send({ done: true });
+    const response = await request(app).put("/api/todos/1").send({ done: true });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ id: 1, title: "buy milk", done: true });
@@ -231,9 +224,7 @@ describe("PUT /api/todos/:id", () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
     await request(app).put("/api/todos/1").send({ done: true });
 
-    const response = await request(app)
-      .put("/api/todos/1")
-      .send({ done: false });
+    const response = await request(app).put("/api/todos/1").send({ done: false });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ id: 1, title: "buy milk", done: false });
@@ -245,9 +236,7 @@ describe("PUT /api/todos/:id", () => {
   it("returns 404 for an unknown id", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
-    const response = await request(app)
-      .put("/api/todos/999")
-      .send({ done: true });
+    const response = await request(app).put("/api/todos/999").send({ done: true });
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ error: "todo not found" });
@@ -257,9 +246,7 @@ describe("PUT /api/todos/:id", () => {
   });
 
   it("returns 400 for a non-integer id", async () => {
-    const response = await request(app)
-      .put("/api/todos/abc")
-      .send({ done: true });
+    const response = await request(app).put("/api/todos/abc").send({ done: true });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "id must be a positive integer" });
@@ -280,9 +267,7 @@ describe("PUT /api/todos/:id", () => {
 
 describe("PUT /api/todos/:id SHA-256 hash logging", () => {
   const body = { done: true };
-  const expectedHash = createHash("sha256")
-    .update(JSON.stringify(body))
-    .digest("hex");
+  const expectedHash = createHash("sha256").update(JSON.stringify(body)).digest("hex");
 
   async function seedTodo() {
     await request(app).post("/api/todos").send({ title: "buy milk" });
@@ -321,9 +306,7 @@ describe("PUT /api/todos/:id SHA-256 hash logging", () => {
     const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     await seedTodo();
 
-    const response = await request(app)
-      .put("/api/todos/1")
-      .send({ done: "invalid" });
+    const response = await request(app).put("/api/todos/1").send({ done: "invalid" });
 
     expect(response.status).toBe(400);
     expect(infoSpy).not.toHaveBeenCalledWith("todo_update_hash", expect.anything());
@@ -357,9 +340,10 @@ describe("PUT /api/todos/:id SHA-256 hash logging", () => {
   });
 
   it("records the log-todo-update-hash flag in flags.json", () => {
-    const list = JSON.parse(
-      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
-    ) as Array<{ slug: string; description: string }>;
+    const list = JSON.parse(readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")) as Array<{
+      slug: string;
+      description: string;
+    }>;
 
     const entry = list.find((f) => f.slug === "log-todo-update-hash");
 
@@ -372,9 +356,7 @@ describe("PATCH /api/todos/:id", () => {
   it("updates a todo to done=true and returns it", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
-    const response = await request(app)
-      .patch("/api/todos/1")
-      .send({ done: true });
+    const response = await request(app).patch("/api/todos/1").send({ done: true });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ id: 1, title: "buy milk", done: true });
@@ -387,9 +369,7 @@ describe("PATCH /api/todos/:id", () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
     await request(app).patch("/api/todos/1").send({ done: true });
 
-    const response = await request(app)
-      .patch("/api/todos/1")
-      .send({ done: false });
+    const response = await request(app).patch("/api/todos/1").send({ done: false });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ id: 1, title: "buy milk", done: false });
@@ -401,9 +381,7 @@ describe("PATCH /api/todos/:id", () => {
   it("returns 404 for an unknown id", async () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
-    const response = await request(app)
-      .patch("/api/todos/999")
-      .send({ done: true });
+    const response = await request(app).patch("/api/todos/999").send({ done: true });
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ error: "todo not found" });
@@ -417,9 +395,7 @@ describe("PATCH /api/todos/:id", () => {
     ["a negative id", "-1"],
     ["a non-integer id", "abc"],
   ])("returns 400 for %s", async (_label, id) => {
-    const response = await request(app)
-      .patch(`/api/todos/${id}`)
-      .send({ done: true });
+    const response = await request(app).patch(`/api/todos/${id}`).send({ done: true });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "id must be a positive integer" });

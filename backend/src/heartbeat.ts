@@ -15,10 +15,7 @@ export const HEARTBEAT_INTERVAL_SECONDS = 2;
  */
 export function startHeartbeatLogging(): NodeJS.Timeout {
   const timer = setInterval(async () => {
-    const enabled = await getFeatureFlagClient().getBooleanValue(
-      featureKey("heartbeat"),
-      false
-    );
+    const enabled = await getFeatureFlagClient().getBooleanValue(featureKey("heartbeat"), false);
     if (enabled) {
       logger.error("heartbeat");
     }
@@ -46,10 +43,7 @@ export const FAST_HEARTBEAT_INTERVAL_SECONDS = 1;
  */
 export function startFastHeartbeatLogging(): NodeJS.Timeout {
   const timer = setInterval(async () => {
-    const enabled = await getFeatureFlagClient().getBooleanValue(
-      featureKey("fast-heartbeat"),
-      false
-    );
+    const enabled = await getFeatureFlagClient().getBooleanValue(featureKey("fast-heartbeat"), false);
     if (enabled) {
       logger.error("heartbeat-fast");
     }

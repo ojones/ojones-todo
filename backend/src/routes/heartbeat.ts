@@ -1,9 +1,6 @@
 import { Router } from "express";
 import { isFeatureEnabled } from "../feature-flags";
-import {
-  FAST_HEARTBEAT_INTERVAL_SECONDS,
-  HEARTBEAT_INTERVAL_SECONDS,
-} from "../heartbeat";
+import { FAST_HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS } from "../heartbeat";
 
 /**
  * Heartbeat API route. Behind the `heartbeat` feature flag

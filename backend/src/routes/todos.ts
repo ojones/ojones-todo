@@ -98,9 +98,7 @@ function putTodoHandler(store: TodoStore): RequestHandler {
     await update(req, res, () => {});
     if (res.headersSent && res.statusCode === 200) {
       if (await isFeatureEnabled(res, LOG_TODO_UPDATE_HASH)) {
-        const hash = createHash("sha256")
-          .update(JSON.stringify(req.body))
-          .digest("hex");
+        const hash = createHash("sha256").update(JSON.stringify(req.body)).digest("hex");
         logger.info("todo_update_hash", { id: Number(req.params.id), sha256: hash });
       }
     }

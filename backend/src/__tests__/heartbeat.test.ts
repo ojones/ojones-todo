@@ -51,9 +51,10 @@ describe("GET /api/heartbeat", () => {
   });
 
   it("records the heartbeat flag in flags.json", () => {
-    const list = JSON.parse(
-      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
-    ) as Array<{ slug: string; description: string }>;
+    const list = JSON.parse(readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")) as Array<{
+      slug: string;
+      description: string;
+    }>;
 
     const entry = list.find((f) => f.slug === "heartbeat");
 
@@ -139,9 +140,10 @@ describe("GET /api/heartbeat/fast", () => {
   });
 
   it("records the fast-heartbeat flag in flags.json", () => {
-    const list = JSON.parse(
-      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
-    ) as Array<{ slug: string; description: string }>;
+    const list = JSON.parse(readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")) as Array<{
+      slug: string;
+      description: string;
+    }>;
 
     const entry = list.find((f) => f.slug === "fast-heartbeat");
 
@@ -205,4 +207,3 @@ describe("fast heartbeat background logging", () => {
     expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 });
-

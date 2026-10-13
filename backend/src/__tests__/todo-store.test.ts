@@ -111,9 +111,7 @@ describe("TodoStore.delete", () => {
 
     store.delete(2);
 
-    expect(store.listDeleted()).toEqual([
-      { id: 2, title: "delete me", done: false },
-    ]);
+    expect(store.listDeleted()).toEqual([{ id: 2, title: "delete me", done: false }]);
     // The record survives: it is only hidden from list(), never removed.
     expect(store.listDeleted().some((t) => t.id === 2)).toBe(true);
   });
@@ -127,8 +125,6 @@ describe("TodoStore.delete", () => {
     const created = store.add("new todo");
     expect(created.id).toBe(2);
     expect(store.list()).toEqual([{ id: 2, title: "new todo", done: false }]);
-    expect(store.listDeleted()).toEqual([
-      { id: 1, title: "write tests", done: false },
-    ]);
+    expect(store.listDeleted()).toEqual([{ id: 1, title: "write tests", done: false }]);
   });
 });
