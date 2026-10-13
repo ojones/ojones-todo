@@ -8,11 +8,11 @@
     "description": "GET /api/heartbeat/fast and background logging of one error-level line every 1 second (post-release monitoring test)"
   },
   {
-    "slug": "todo-ui",
-    "description": "Todo UI page and GET /api/ui-flags; off keeps the Starter Template placeholder"
+    "slug": "todos-count-endpoint",
+    "description": "GET /api/todos/count returns {\"count\": N}, the number of live todos"
   },
   {
-    "slug": "version-endpoint",
-    "description": "ojones/ai-factory#97: GET /api/version returns {\"version\": \"1\"}; off answers 404 like an unknown route"
+    "slug": "todo-ui",
+    "description": "Todo UI page and GET /api/ui-flags; off keeps the Starter Template placeholder"
   }
 ]

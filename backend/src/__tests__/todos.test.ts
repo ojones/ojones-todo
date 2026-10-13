@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
@@ -13,11 +15,15 @@ import { logger } from "../logger";
 // suite is self-contained and the result reflects the routes, not the loader.
 process.env.APP_SLUG ??= "test-app";
 
-function flags() {
+function flags(todosCountEndpointOn = true) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
       defaultVariant: "on",
+    },
+    "test-app.feature.todos-count-endpoint": {
+      variants: { on: true, off: false },
+      defaultVariant: todosCountEndpointOn ? "on" : "off",
     },
   });
 }
@@ -127,6 +133,29 @@ describe("GET /api/todos/count", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ count: 2 });
+  });
+
+  it("returns 404 while the todos-count-endpoint flag is off", async () => {
+    OpenFeature.setProvider(flags(false));
+    app = createApp();
+    await request(app).post("/api/todos").send({ title: "buy milk" });
+
+    const response = await request(app).get("/api/todos/count");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "not found" });
+  });
+
+  it("records the todos-count-endpoint flag in flags.json", () => {
+    const list = JSON.parse(readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")) as Array<{
+      slug: string;
+      description: string;
+    }>;
+
+    const entry = list.find((f) => f.slug === "todos-count-endpoint");
+
+    expect(entry).toBeTruthy();
+    expect(String(entry?.description).length).toBeGreaterThan(0);
   });
 });
 

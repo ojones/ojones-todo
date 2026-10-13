@@ -16,10 +16,10 @@ function flags(killSwitchOn: boolean, demoOn: boolean) {
       variants: { on: true, off: false },
       defaultVariant: demoOn ? "on" : "off",
     },
-    // A real, app-mounted gated route (`GET /api/version`), always off, so
+    // A real, app-mounted gated route (`GET /api/todos/count`), always off, so
     // the preview override is exercised end to end rather than on a synthetic
     // probe route the deployment does not serve.
-    "test-app.feature.version-endpoint": {
+    "test-app.feature.todos-count-endpoint": {
       variants: { on: true, off: false },
       defaultVariant: "off",
     },
@@ -88,17 +88,17 @@ describe("Preview Token", () => {
   });
 
   // The probe above is a test-only route. These drive a real, app-mounted,
-  // flag-gated route (`GET /api/version`) that the deployment actually
+  // flag-gated route (`GET /api/todos/count`) that the deployment actually
   // serves, so the preview override is proven on the shipped code path.
   it("unlocks a real gated route for a token holder and keeps it dark without one", async () => {
-    const dark = await request(createApp()).get("/api/version");
+    const dark = await request(createApp()).get("/api/todos/count");
     expect(dark.status).toBe(404);
 
-    const lit = await request(createApp()).get("/api/version").set("X-Preview-Token", TOKEN);
+    const lit = await request(createApp()).get("/api/todos/count").set("X-Preview-Token", TOKEN);
     expect(lit.status).toBe(200);
-    expect(lit.body).toEqual({ version: "1" });
+    expect(lit.body).toEqual({ count: 0 });
 
-    const wrong = await request(createApp()).get("/api/version").set("X-Preview-Token", "wrong-token");
+    const wrong = await request(createApp()).get("/api/todos/count").set("X-Preview-Token", "wrong-token");
     expect(wrong.status).toBe(404);
   });
 });
