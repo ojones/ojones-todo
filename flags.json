@@ -14,5 +14,9 @@
   {
     "slug": "todos-count-endpoint",
     "description": "GET /api/todos/count returns {\"count\": N}, the number of live todos"
+  },
+  {
+    "slug": "todo-ui",
+    "description": "Todo UI page and GET /api/ui-flags; off keeps the Starter Template placeholder"
   }
 ]
