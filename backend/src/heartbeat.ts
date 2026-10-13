@@ -43,26 +43,15 @@ export const FAST_HEARTBEAT_INTERVAL_SECONDS = 1;
  * the `fast-heartbeat` flag on every tick (never cached), so turning the flag
  * off stops the logging at the next tick — within one second. Logs nothing
  * while the flag is off.
- *
- * When the `fix-fast-heartbeat-logging` flag is enabled, uses info level instead
- * of error level to prevent false alerts.
  */
 export function startFastHeartbeatLogging(): NodeJS.Timeout {
   const timer = setInterval(async () => {
-    const fastHeartbeatEnabled = await getFeatureFlagClient().getBooleanValue(
+    const enabled = await getFeatureFlagClient().getBooleanValue(
       featureKey("fast-heartbeat"),
       false
     );
-    if (fastHeartbeatEnabled) {
-      const useInfoLevel = await getFeatureFlagClient().getBooleanValue(
-        featureKey("fix-fast-heartbeat-logging"),
-        false
-      );
-      if (useInfoLevel) {
-        logger.info("heartbeat-fast");
-      } else {
-        logger.error("heartbeat-fast");
-      }
+    if (enabled) {
+      logger.error("heartbeat-fast");
     }
   }, FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
 

@@ -13,11 +13,7 @@ import {
 } from "../heartbeat";
 
 // Flag keys are scoped by app slug (feature-flags.ts); setup.ts uses "test-app".
-function flags(
-  heartbeatOn: boolean,
-  fastHeartbeatOn = false,
-  fixFastHeartbeatLoggingOn = false
-) {
+function flags(heartbeatOn: boolean, fastHeartbeatOn = false) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
@@ -31,38 +27,7 @@ function flags(
       variants: { on: true, off: false },
       defaultVariant: fastHeartbeatOn ? "on" : "off",
     },
-    "test-app.feature.fix-fast-heartbeat-logging": {
-      variants: { on: true, off: false },
-      defaultVariant: fixFastHeartbeatLoggingOn ? "on" : "off",
-    },
   });
-}
-
-/**
- * Captures the real structured log lines the logger writes to stdout, so a
- * test asserts the actual JSON output (its level and message) rather than only
- * that a logger method was called.
- */
-function captureLogLines(): Array<{ level?: string; message?: string }> {
-  const lines: Array<{ level?: string; message?: string }> = [];
-  vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-    for (const arg of args) {
-      if (typeof arg !== "string") continue;
-      try {
-        const parsed = JSON.parse(arg);
-        if (parsed && typeof parsed === "object") lines.push(parsed);
-      } catch {
-        // Not a structured log line; ignore.
-      }
-    }
-  });
-  return lines;
-}
-
-function fastHeartbeatLines(
-  lines: Array<{ level?: string; message?: string }>
-): Array<{ level?: string; message?: string }> {
-  return lines.filter((line) => line.message === "heartbeat-fast");
 }
 
 describe("GET /api/heartbeat", () => {
@@ -199,166 +164,45 @@ describe("fast heartbeat background logging", () => {
     vi.restoreAllMocks();
   });
 
-  it("logs nothing while the fast-heartbeat flag is off", async () => {
+  it("logs nothing while the flag is off", async () => {
     OpenFeature.setProvider(flags(false, false));
     const errorSpy = vi.spyOn(logger, "error");
-    const infoSpy = vi.spyOn(logger, "info");
 
     timer = startFastHeartbeatLogging();
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000 * 3);
 
     expect(errorSpy).not.toHaveBeenCalled();
-    expect(infoSpy).not.toHaveBeenCalled();
   });
 
-  it("records the fix-fast-heartbeat-logging flag in flags.json", () => {
-    const list = JSON.parse(
-      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
-    ) as Array<{ slug: string; description: string }>;
-
-    const entry = list.find((f) => f.slug === "fix-fast-heartbeat-logging");
-
-    expect(entry).toBeTruthy();
-    expect(String(entry?.description).length).toBeGreaterThan(0);
-  });
-
-  // AC-2: while the fix flag is off, the original error-level behavior is kept.
-  it("logs one error line per second while the fix flag is off", async () => {
-    OpenFeature.setProvider(flags(false, true, false));
+  it("logs one error line per second while the flag is on", async () => {
+    OpenFeature.setProvider(flags(false, true));
     const errorSpy = vi.spyOn(logger, "error");
-    const infoSpy = vi.spyOn(logger, "info");
-    const lines = captureLogLines();
 
     timer = startFastHeartbeatLogging();
 
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith("heartbeat-fast");
-    expect(infoSpy).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
     expect(errorSpy).toHaveBeenCalledTimes(2);
-    expect(infoSpy).not.toHaveBeenCalled();
-
-    // The real structured output: two error-level heartbeat-fast lines.
-    const emitted = fastHeartbeatLines(lines);
-    expect(emitted).toHaveLength(2);
-    expect(emitted.every((line) => line.level === "error")).toBe(true);
   });
 
-  // AC-1: while the fix flag is on, the fast heartbeat logs at info level.
-  it("logs one info line per second while the fix flag is on", async () => {
-    OpenFeature.setProvider(flags(false, true, true));
+  it("stops logging within one second after the flag is turned off", async () => {
+    OpenFeature.setProvider(flags(false, true));
     const errorSpy = vi.spyOn(logger, "error");
-    const infoSpy = vi.spyOn(logger, "info");
-    const lines = captureLogLines();
 
     timer = startFastHeartbeatLogging();
 
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
-    expect(infoSpy).toHaveBeenCalledTimes(1);
-    expect(infoSpy).toHaveBeenCalledWith("heartbeat-fast");
-    expect(errorSpy).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
-    expect(infoSpy).toHaveBeenCalledTimes(2);
-    expect(errorSpy).not.toHaveBeenCalled();
-
-    // The real structured output: two info-level heartbeat-fast lines.
-    const emitted = fastHeartbeatLines(lines);
-    expect(emitted).toHaveLength(2);
-    expect(emitted.every((line) => line.level === "info")).toBe(true);
-  });
-
-  // AC-3: without the fix, 100 seconds of fast heartbeat produce 100 error logs.
-  it("produces 100 error logs over 100 seconds while the fix flag is off", async () => {
-    OpenFeature.setProvider(flags(false, true, false));
-    const errorSpy = vi.spyOn(logger, "error");
-    const infoSpy = vi.spyOn(logger, "info");
-    const lines = captureLogLines();
-
-    timer = startFastHeartbeatLogging();
-    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000 * 100);
-
-    expect(errorSpy).toHaveBeenCalledTimes(100);
-    expect(errorSpy).toHaveBeenCalledWith("heartbeat-fast");
-    expect(infoSpy).not.toHaveBeenCalled();
-
-    // The real structured output: 100 error-level heartbeat-fast lines.
-    const emitted = fastHeartbeatLines(lines);
-    expect(emitted).toHaveLength(100);
-    expect(emitted.every((line) => line.level === "error")).toBe(true);
-  });
-
-  // AC-4: with the fix, 100 seconds of fast heartbeat produce 0 error logs.
-  it("produces 0 error logs over 100 seconds while the fix flag is on", async () => {
-    OpenFeature.setProvider(flags(false, true, true));
-    const errorSpy = vi.spyOn(logger, "error");
-    const infoSpy = vi.spyOn(logger, "info");
-    const lines = captureLogLines();
-
-    timer = startFastHeartbeatLogging();
-    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000 * 100);
-
-    expect(errorSpy).not.toHaveBeenCalled();
-    expect(infoSpy).toHaveBeenCalledTimes(100);
-    expect(infoSpy).toHaveBeenCalledWith("heartbeat-fast");
-
-    // The real structured output: 100 info-level lines and no error-level ones.
-    const emitted = fastHeartbeatLines(lines);
-    expect(emitted).toHaveLength(100);
-    expect(emitted.every((line) => line.level === "info")).toBe(true);
-  });
-
-  it("stops logging within one second after the fast-heartbeat flag is turned off", async () => {
-    OpenFeature.setProvider(flags(false, true, true));
-    const errorSpy = vi.spyOn(logger, "error");
-    const infoSpy = vi.spyOn(logger, "info");
-
-    timer = startFastHeartbeatLogging();
-
-    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
-    expect(infoSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
 
     // The flag is re-read on every tick, so turning it off stops the logging
     // at the next tick — no more than one second later.
-    OpenFeature.setProvider(flags(false, false, true));
-    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
-
-    expect(infoSpy).toHaveBeenCalledTimes(1);
-    expect(errorSpy).not.toHaveBeenCalled();
-  });
-
-  // Resilience: if the provider has no `fix-fast-heartbeat-logging` variant at
-  // all, the code's `false` default must apply, so the log level stays `error`
-  // rather than silently flipping to `info`.
-  it("falls back to error level when the fix flag is absent from the provider", async () => {
-    OpenFeature.setProvider(
-      new TypedInMemoryProvider({
-        "test-app.global-kill-switch": {
-          variants: { on: true, off: false },
-          defaultVariant: "on",
-        },
-        "test-app.feature.fast-heartbeat": {
-          variants: { on: true, off: false },
-          defaultVariant: "on",
-        },
-      })
-    );
-    const errorSpy = vi.spyOn(logger, "error");
-    const infoSpy = vi.spyOn(logger, "info");
-    const lines = captureLogLines();
-
-    timer = startFastHeartbeatLogging();
+    OpenFeature.setProvider(flags(false, false));
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
 
     expect(errorSpy).toHaveBeenCalledTimes(1);
-    expect(errorSpy).toHaveBeenCalledWith("heartbeat-fast");
-    expect(infoSpy).not.toHaveBeenCalled();
-
-    const emitted = fastHeartbeatLines(lines);
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0].level).toBe("error");
   });
 });
 
