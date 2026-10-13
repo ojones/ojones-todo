@@ -14,3 +14,15 @@ shape works end to end — they are intentionally trivial.
 
 See [AGENTS.md](AGENTS.md) in this directory for how to run, build, and
 test it, and for pointers back to the full Standards.
+
+## Development
+
+Run these npm scripts from the repository root:
+
+- `npm run check` — Type-checks both workspaces and runs ESLint. It does not
+  build a bundle, so it finishes in seconds.
+- `npm run format` — Rewrites files with Prettier. Run it before committing;
+  the formatter is the style guide.
+- `npm test` — Runs the backend's full vitest suite.
+- `npm run verify` — Runs `check` followed by the full test suite. Use it as
+  the fast gate before pushing, without the Vite bundle.
