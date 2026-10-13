@@ -15,15 +15,11 @@ import { logger } from "../logger";
 // suite is self-contained and the result reflects the routes, not the loader.
 process.env.APP_SLUG ??= "test-app";
 
-function flags(logTodoUpdateHashOn = false, todosCountEndpointOn = true) {
+function flags(todosCountEndpointOn = true) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
       defaultVariant: "on",
-    },
-    "test-app.feature.log-todo-update-hash": {
-      variants: { on: true, off: false },
-      defaultVariant: logTodoUpdateHashOn ? "on" : "off",
     },
     "test-app.feature.todos-count-endpoint": {
       variants: { on: true, off: false },
@@ -140,7 +136,7 @@ describe("GET /api/todos/count", () => {
   });
 
   it("returns 404 while the todos-count-endpoint flag is off", async () => {
-    OpenFeature.setProvider(flags(false, false));
+    OpenFeature.setProvider(flags(false));
     app = createApp();
     await request(app).post("/api/todos").send({ title: "buy milk" });
 
@@ -273,9 +269,7 @@ describe("PUT /api/todos/:id SHA-256 hash logging", () => {
     await request(app).post("/api/todos").send({ title: "buy milk" });
   }
 
-  it("logs the SHA-256 hash of the request body at info level when the flag is on", async () => {
-    OpenFeature.setProvider(flags(true));
-    app = createApp();
+  it("logs the SHA-256 hash of the request body at info level", async () => {
     const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     await seedTodo();
 
@@ -288,21 +282,7 @@ describe("PUT /api/todos/:id SHA-256 hash logging", () => {
     });
   });
 
-  it("does not log the hash while the flag is off", async () => {
-    OpenFeature.setProvider(flags(false));
-    app = createApp();
-    const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
-    await seedTodo();
-
-    const response = await request(app).put("/api/todos/1").send(body);
-
-    expect(response.status).toBe(200);
-    expect(infoSpy).not.toHaveBeenCalledWith("todo_update_hash", expect.anything());
-  });
-
   it("does not log the hash for an invalid body", async () => {
-    OpenFeature.setProvider(flags(true));
-    app = createApp();
     const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     await seedTodo();
 
@@ -313,8 +293,6 @@ describe("PUT /api/todos/:id SHA-256 hash logging", () => {
   });
 
   it("keeps the hash out of the response body and headers", async () => {
-    OpenFeature.setProvider(flags(true));
-    app = createApp();
     vi.spyOn(logger, "info").mockImplementation(() => {});
     await seedTodo();
 
@@ -328,8 +306,6 @@ describe("PUT /api/todos/:id SHA-256 hash logging", () => {
   });
 
   it("does not log the hash for PATCH requests", async () => {
-    OpenFeature.setProvider(flags(true));
-    app = createApp();
     const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     await seedTodo();
 
@@ -337,18 +313,6 @@ describe("PUT /api/todos/:id SHA-256 hash logging", () => {
 
     expect(response.status).toBe(200);
     expect(infoSpy).not.toHaveBeenCalledWith("todo_update_hash", expect.anything());
-  });
-
-  it("records the log-todo-update-hash flag in flags.json", () => {
-    const list = JSON.parse(readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")) as Array<{
-      slug: string;
-      description: string;
-    }>;
-
-    const entry = list.find((f) => f.slug === "log-todo-update-hash");
-
-    expect(entry).toBeTruthy();
-    expect(String(entry?.description).length).toBeGreaterThan(0);
   });
 });
 

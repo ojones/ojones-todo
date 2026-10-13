@@ -4,9 +4,6 @@ import type { TodoStore } from "../todos";
 import { logger } from "../logger";
 import { isFeatureEnabled } from "../feature-flags";
 
-/** Feature flag gating SHA-256 hash logging for PUT /api/todos/:id. */
-const LOG_TODO_UPDATE_HASH = "log-todo-update-hash";
-
 /** Feature flag gating GET /api/todos/count. */
 const TODOS_COUNT_ENDPOINT = "todos-count-endpoint";
 
@@ -60,9 +57,9 @@ export function todosRouter(store: TodoStore): Router {
   // are always available and have no feature-flag gate, so they work
   // regardless of any flag status.
   //
-  // PUT additionally logs the SHA-256 hash of the request body when the
-  // `log-todo-update-hash` flag is on. That flag wraps the whole change and
-  // only affects logging; PATCH is unaffected.
+  // PUT additionally logs the SHA-256 hash of the request body, always on:
+  // the flag that once guarded it has been retired. This only affects
+  // logging; PATCH is unaffected.
   router.put("/api/todos/:id", putTodoHandler(store));
   router.patch("/api/todos/:id", updateTodoHandler(store));
 
@@ -89,18 +86,15 @@ export function todosRouter(store: TodoStore): Router {
 /**
  * PUT /api/todos/:id. Behaves exactly like the shared update handler, and
  * additionally writes one info-level log line carrying the SHA-256 hash of
- * the request body when the `log-todo-update-hash` flag is on. The hash is
- * only ever logged, never returned.
+ * the request body. The hash is only ever logged, never returned.
  */
 function putTodoHandler(store: TodoStore): RequestHandler {
   const update = updateTodoHandler(store);
   return async (req, res) => {
     await update(req, res, () => {});
     if (res.headersSent && res.statusCode === 200) {
-      if (await isFeatureEnabled(res, LOG_TODO_UPDATE_HASH)) {
-        const hash = createHash("sha256").update(JSON.stringify(req.body)).digest("hex");
-        logger.info("todo_update_hash", { id: Number(req.params.id), sha256: hash });
-      }
+      const hash = createHash("sha256").update(JSON.stringify(req.body)).digest("hex");
+      logger.info("todo_update_hash", { id: Number(req.params.id), sha256: hash });
     }
   };
 }
