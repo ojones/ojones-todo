@@ -13,7 +13,11 @@ import {
 } from "../heartbeat";
 
 // Flag keys are scoped by app slug (feature-flags.ts); setup.ts uses "test-app".
-function flags(heartbeatOn: boolean, fastHeartbeatOn = false) {
+function flags(
+  heartbeatOn: boolean,
+  fastHeartbeatOn = false,
+  fixFastHeartbeatLoggingOn = false
+) {
   return new TypedInMemoryProvider({
     "test-app.global-kill-switch": {
       variants: { on: true, off: false },
@@ -26,6 +30,10 @@ function flags(heartbeatOn: boolean, fastHeartbeatOn = false) {
     "test-app.feature.fast-heartbeat": {
       variants: { on: true, off: false },
       defaultVariant: fastHeartbeatOn ? "on" : "off",
+    },
+    "test-app.feature.fix-fast-heartbeat-logging": {
+      variants: { on: true, off: false },
+      defaultVariant: fixFastHeartbeatLoggingOn ? "on" : "off",
     },
   });
 }
@@ -164,45 +172,110 @@ describe("fast heartbeat background logging", () => {
     vi.restoreAllMocks();
   });
 
-  it("logs nothing while the flag is off", async () => {
+  it("logs nothing while the fast-heartbeat flag is off", async () => {
     OpenFeature.setProvider(flags(false, false));
     const errorSpy = vi.spyOn(logger, "error");
+    const infoSpy = vi.spyOn(logger, "info");
 
     timer = startFastHeartbeatLogging();
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000 * 3);
 
     expect(errorSpy).not.toHaveBeenCalled();
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 
-  it("logs one error line per second while the flag is on", async () => {
-    OpenFeature.setProvider(flags(false, true));
+  it("records the fix-fast-heartbeat-logging flag in flags.json", () => {
+    const list = JSON.parse(
+      readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")
+    ) as Array<{ slug: string; description: string }>;
+
+    const entry = list.find((f) => f.slug === "fix-fast-heartbeat-logging");
+
+    expect(entry).toBeTruthy();
+    expect(String(entry?.description).length).toBeGreaterThan(0);
+  });
+
+  // AC-2: while the fix flag is off, the original error-level behavior is kept.
+  it("logs one error line per second while the fix flag is off", async () => {
+    OpenFeature.setProvider(flags(false, true, false));
     const errorSpy = vi.spyOn(logger, "error");
+    const infoSpy = vi.spyOn(logger, "info");
 
     timer = startFastHeartbeatLogging();
 
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith("heartbeat-fast");
+    expect(infoSpy).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
     expect(errorSpy).toHaveBeenCalledTimes(2);
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 
-  it("stops logging within one second after the flag is turned off", async () => {
-    OpenFeature.setProvider(flags(false, true));
+  // AC-1: while the fix flag is on, the fast heartbeat logs at info level.
+  it("logs one info line per second while the fix flag is on", async () => {
+    OpenFeature.setProvider(flags(false, true, true));
     const errorSpy = vi.spyOn(logger, "error");
+    const infoSpy = vi.spyOn(logger, "info");
 
     timer = startFastHeartbeatLogging();
 
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
-    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(infoSpy).toHaveBeenCalledTimes(1);
+    expect(infoSpy).toHaveBeenCalledWith("heartbeat-fast");
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
+    expect(infoSpy).toHaveBeenCalledTimes(2);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  // AC-3: without the fix, 100 seconds of fast heartbeat produce 100 error logs.
+  it("produces 100 error logs over 100 seconds while the fix flag is off", async () => {
+    OpenFeature.setProvider(flags(false, true, false));
+    const errorSpy = vi.spyOn(logger, "error");
+    const infoSpy = vi.spyOn(logger, "info");
+
+    timer = startFastHeartbeatLogging();
+    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000 * 100);
+
+    expect(errorSpy).toHaveBeenCalledTimes(100);
+    expect(errorSpy).toHaveBeenCalledWith("heartbeat-fast");
+    expect(infoSpy).not.toHaveBeenCalled();
+  });
+
+  // AC-4: with the fix, 100 seconds of fast heartbeat produce 0 error logs.
+  it("produces 0 error logs over 100 seconds while the fix flag is on", async () => {
+    OpenFeature.setProvider(flags(false, true, true));
+    const errorSpy = vi.spyOn(logger, "error");
+    const infoSpy = vi.spyOn(logger, "info");
+
+    timer = startFastHeartbeatLogging();
+    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000 * 100);
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledTimes(100);
+    expect(infoSpy).toHaveBeenCalledWith("heartbeat-fast");
+  });
+
+  it("stops logging within one second after the fast-heartbeat flag is turned off", async () => {
+    OpenFeature.setProvider(flags(false, true, true));
+    const errorSpy = vi.spyOn(logger, "error");
+    const infoSpy = vi.spyOn(logger, "info");
+
+    timer = startFastHeartbeatLogging();
+
+    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
+    expect(infoSpy).toHaveBeenCalledTimes(1);
 
     // The flag is re-read on every tick, so turning it off stops the logging
     // at the next tick — no more than one second later.
-    OpenFeature.setProvider(flags(false, false));
+    OpenFeature.setProvider(flags(false, false, true));
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
 
-    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(infoSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });
 
