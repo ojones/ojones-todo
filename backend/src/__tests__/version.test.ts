@@ -70,6 +70,9 @@ describe("GET /api/version", () => {
     const entry = list.find((f) => f.slug === "version-endpoint");
 
     expect(entry).toBeTruthy();
-    expect(String(entry?.description).length).toBeGreaterThan(0);
+    // The Orchestrator reads this entry to create the flag, so it must name
+    // the story and the route the flag guards, not just exist.
+    expect(entry?.description).toContain("ojones/ai-factory#97");
+    expect(entry?.description).toContain("GET /api/version");
   });
 });
