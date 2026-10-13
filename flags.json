@@ -14,5 +14,9 @@
   {
     "slug": "todo-ui",
     "description": "Todo UI page and GET /api/ui-flags; off keeps the Starter Template placeholder"
+  },
+  {
+    "slug": "version-endpoint",
+    "description": "ojones/ai-factory#97: GET /api/version returns {\"version\": \"1\"}; off answers 404 like an unknown route"
   }
 ]
