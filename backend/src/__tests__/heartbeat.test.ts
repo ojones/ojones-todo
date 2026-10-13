@@ -328,5 +328,37 @@ describe("fast heartbeat background logging", () => {
     expect(infoSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).not.toHaveBeenCalled();
   });
+
+  // Resilience: if the provider has no `fix-fast-heartbeat-logging` variant at
+  // all, the code's `false` default must apply, so the log level stays `error`
+  // rather than silently flipping to `info`.
+  it("falls back to error level when the fix flag is absent from the provider", async () => {
+    OpenFeature.setProvider(
+      new TypedInMemoryProvider({
+        "test-app.global-kill-switch": {
+          variants: { on: true, off: false },
+          defaultVariant: "on",
+        },
+        "test-app.feature.fast-heartbeat": {
+          variants: { on: true, off: false },
+          defaultVariant: "on",
+        },
+      })
+    );
+    const errorSpy = vi.spyOn(logger, "error");
+    const infoSpy = vi.spyOn(logger, "info");
+    const lines = captureLogLines();
+
+    timer = startFastHeartbeatLogging();
+    await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith("heartbeat-fast");
+    expect(infoSpy).not.toHaveBeenCalled();
+
+    const emitted = fastHeartbeatLines(lines);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0].level).toBe("error");
+  });
 });
 
