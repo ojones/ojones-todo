@@ -38,6 +38,33 @@ function flags(
   });
 }
 
+/**
+ * Captures the real structured log lines the logger writes to stdout, so a
+ * test asserts the actual JSON output (its level and message) rather than only
+ * that a logger method was called.
+ */
+function captureLogLines(): Array<{ level?: string; message?: string }> {
+  const lines: Array<{ level?: string; message?: string }> = [];
+  vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    for (const arg of args) {
+      if (typeof arg !== "string") continue;
+      try {
+        const parsed = JSON.parse(arg);
+        if (parsed && typeof parsed === "object") lines.push(parsed);
+      } catch {
+        // Not a structured log line; ignore.
+      }
+    }
+  });
+  return lines;
+}
+
+function fastHeartbeatLines(
+  lines: Array<{ level?: string; message?: string }>
+): Array<{ level?: string; message?: string }> {
+  return lines.filter((line) => line.message === "heartbeat-fast");
+}
+
 describe("GET /api/heartbeat", () => {
   it("returns 404 while the heartbeat flag is off", async () => {
     OpenFeature.setProvider(flags(false));
@@ -200,6 +227,7 @@ describe("fast heartbeat background logging", () => {
     OpenFeature.setProvider(flags(false, true, false));
     const errorSpy = vi.spyOn(logger, "error");
     const infoSpy = vi.spyOn(logger, "info");
+    const lines = captureLogLines();
 
     timer = startFastHeartbeatLogging();
 
@@ -211,6 +239,11 @@ describe("fast heartbeat background logging", () => {
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
     expect(errorSpy).toHaveBeenCalledTimes(2);
     expect(infoSpy).not.toHaveBeenCalled();
+
+    // The real structured output: two error-level heartbeat-fast lines.
+    const emitted = fastHeartbeatLines(lines);
+    expect(emitted).toHaveLength(2);
+    expect(emitted.every((line) => line.level === "error")).toBe(true);
   });
 
   // AC-1: while the fix flag is on, the fast heartbeat logs at info level.
@@ -218,6 +251,7 @@ describe("fast heartbeat background logging", () => {
     OpenFeature.setProvider(flags(false, true, true));
     const errorSpy = vi.spyOn(logger, "error");
     const infoSpy = vi.spyOn(logger, "info");
+    const lines = captureLogLines();
 
     timer = startFastHeartbeatLogging();
 
@@ -229,6 +263,11 @@ describe("fast heartbeat background logging", () => {
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000);
     expect(infoSpy).toHaveBeenCalledTimes(2);
     expect(errorSpy).not.toHaveBeenCalled();
+
+    // The real structured output: two info-level heartbeat-fast lines.
+    const emitted = fastHeartbeatLines(lines);
+    expect(emitted).toHaveLength(2);
+    expect(emitted.every((line) => line.level === "info")).toBe(true);
   });
 
   // AC-3: without the fix, 100 seconds of fast heartbeat produce 100 error logs.
@@ -236,6 +275,7 @@ describe("fast heartbeat background logging", () => {
     OpenFeature.setProvider(flags(false, true, false));
     const errorSpy = vi.spyOn(logger, "error");
     const infoSpy = vi.spyOn(logger, "info");
+    const lines = captureLogLines();
 
     timer = startFastHeartbeatLogging();
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000 * 100);
@@ -243,6 +283,11 @@ describe("fast heartbeat background logging", () => {
     expect(errorSpy).toHaveBeenCalledTimes(100);
     expect(errorSpy).toHaveBeenCalledWith("heartbeat-fast");
     expect(infoSpy).not.toHaveBeenCalled();
+
+    // The real structured output: 100 error-level heartbeat-fast lines.
+    const emitted = fastHeartbeatLines(lines);
+    expect(emitted).toHaveLength(100);
+    expect(emitted.every((line) => line.level === "error")).toBe(true);
   });
 
   // AC-4: with the fix, 100 seconds of fast heartbeat produce 0 error logs.
@@ -250,6 +295,7 @@ describe("fast heartbeat background logging", () => {
     OpenFeature.setProvider(flags(false, true, true));
     const errorSpy = vi.spyOn(logger, "error");
     const infoSpy = vi.spyOn(logger, "info");
+    const lines = captureLogLines();
 
     timer = startFastHeartbeatLogging();
     await vi.advanceTimersByTimeAsync(FAST_HEARTBEAT_INTERVAL_SECONDS * 1000 * 100);
@@ -257,6 +303,11 @@ describe("fast heartbeat background logging", () => {
     expect(errorSpy).not.toHaveBeenCalled();
     expect(infoSpy).toHaveBeenCalledTimes(100);
     expect(infoSpy).toHaveBeenCalledWith("heartbeat-fast");
+
+    // The real structured output: 100 info-level lines and no error-level ones.
+    const emitted = fastHeartbeatLines(lines);
+    expect(emitted).toHaveLength(100);
+    expect(emitted.every((line) => line.level === "info")).toBe(true);
   });
 
   it("stops logging within one second after the fast-heartbeat flag is turned off", async () => {
