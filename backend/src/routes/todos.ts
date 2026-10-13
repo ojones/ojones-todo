@@ -2,10 +2,6 @@ import { createHash } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import type { TodoStore } from "../todos";
 import { logger } from "../logger";
-import { isFeatureEnabled } from "../feature-flags";
-
-/** Feature flag gating GET /api/todos/count. */
-const TODOS_COUNT_ENDPOINT = "todos-count-endpoint";
 
 /**
  * Todo API routes. A `TodoStore` is injected so each app instance owns its
@@ -32,15 +28,10 @@ export function todosRouter(store: TodoStore): Router {
     res.json(store.list().filter((todo) => todo.done === wantDone));
   });
 
-  // GET /api/todos/count is gated by the `todos-count-endpoint` flag: it ships
-  // dark and behaves as an unknown route (404) until the Orchestrator releases
-  // it. It reports the number of live todos — counted via list(), so both done
-  // and not-done todos count and soft-deleted ones do not.
-  router.get("/api/todos/count", async (_req, res) => {
-    if (!(await isFeatureEnabled(res, TODOS_COUNT_ENDPOINT))) {
-      res.status(404).json({ error: "not found" });
-      return;
-    }
+  // GET /api/todos/count is always available: the flag that once gated it has
+  // been retired. It reports the number of live todos — counted via list(), so
+  // both done and not-done todos count and soft-deleted ones do not.
+  router.get("/api/todos/count", (_req, res) => {
     res.json({ count: store.list().length });
   });
 
