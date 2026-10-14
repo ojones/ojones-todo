@@ -6,10 +6,10 @@ import type { Express } from "express";
 import { OpenFeature, TypedInMemoryProvider } from "@openfeature/server-sdk";
 import { createApp } from "../app";
 
-// The `todo-ui` flag was retired (retire-flag: todo-ui), so the todo UI is
-// now unconditional: there is no per-visitor flag route to consult. This
-// suite replaces the deleted ui-flags test and covers the released
-// behaviour for an ordinary visitor with no Preview Token.
+// The todo UI used to sit behind a feature flag. That flag was retired, so the
+// UI is now unconditional: there is no per-visitor flag route to consult. This
+// suite covers the released behaviour for an ordinary visitor with no Preview
+// Token — the same visitor who already saw the todo UI before the retirement.
 process.env.APP_SLUG ??= "test-app";
 
 function flags() {
@@ -28,7 +28,7 @@ beforeEach(() => {
   app = createApp();
 });
 
-describe("retired todo-ui: unconditional todo UI for an ordinary visitor", () => {
+describe("unconditional todo UI for an ordinary visitor", () => {
   it("serves GET /api/todos with 200 and no Preview Token or flag call", async () => {
     const response = await request(app).get("/api/todos");
 

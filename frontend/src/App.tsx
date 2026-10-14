@@ -10,11 +10,10 @@ interface Todo {
  * Root component. It renders the todo page, which uses the existing
  * /api/todos routes.
  *
- * The `todo-ui` flag was retired in the same change set (retire-flag:
- * todo-ui). Its removal is not a new, flagless user-facing behaviour change:
- * the todo UI was already released to every visitor, so retiring the flag
- * keeps that released behaviour always on and simply stops asking the flag.
- * There is deliberately no per-visitor flag check here.
+ * The todo UI was previously gated by a feature flag. That flag has been
+ * retired: the UI was already released to every visitor, so its removal keeps
+ * that released behaviour always on and simply stops asking the flag. There is
+ * deliberately no per-visitor flag check here.
  */
 export function App() {
   return (
