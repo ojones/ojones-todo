@@ -4,6 +4,7 @@ import { logger } from "./logger";
 import { healthRouter } from "./routes/health";
 import { heartbeatRouter } from "./routes/heartbeat";
 import { todosRouter } from "./routes/todos";
+import { uiFlagsRouter } from "./routes/ui-flags";
 import { versionRouter } from "./routes/version";
 import { TodoStore } from "./todos";
 import { getFeatureFlagClient, killSwitchKey, previewMiddleware } from "./feature-flags";
@@ -79,6 +80,7 @@ export function createApp(): Express {
   // instance gets its own in-memory todo store.
   app.use(todosRouter(new TodoStore()));
   app.use(heartbeatRouter);
+  app.use(uiFlagsRouter);
   app.use(versionRouter);
 
   // One container: the backend serves the built frontend's static assets
