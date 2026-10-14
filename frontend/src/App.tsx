@@ -7,56 +7,20 @@ interface Todo {
 }
 
 /**
- * Root component. It asks the backend which UI flags this request may see
- * (GET /api/ui-flags) and renders either the todo page or the unchanged
- * Starter Template placeholder. The flag is evaluated server-side, so the
- * Preview Token override decides which page a visitor gets.
+ * Root component. It renders the todo page, which uses the existing
+ * /api/todos routes. The todo UI flag that once chose between the todo page
+ * and the Starter Template placeholder has been retired: the todo page is now
+ * always on.
  */
 export function App() {
-  const [todoUi, setTodoUi] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    fetch("/api/ui-flags")
-      .then((res) => res.json())
-      .then((data: { "todo-ui"?: boolean }) => setTodoUi(data["todo-ui"] === true))
-      .catch(() => setTodoUi(false));
-  }, []);
-
-  if (todoUi === null) {
-    return (
-      <main>
-        <p>Loading...</p>
-      </main>
-    );
-  }
-
-  return <main>{todoUi ? <TodosPage /> : <PlaceholderPage />}</main>;
-}
-
-/**
- * The original placeholder page, shown whenever the `todo-ui` flag is off.
- * This preserves the behaviour the app had before the flag existed: the
- * "Starter Template" heading and the backend health line.
- */
-function PlaceholderPage() {
-  const [status, setStatus] = useState<string>("loading...");
-
-  useEffect(() => {
-    fetch("/api/health")
-      .then((res) => res.json())
-      .then((data: { status: string }) => setStatus(data.status))
-      .catch(() => setStatus("unreachable"));
-  }, []);
-
   return (
-    <>
-      <h1>Starter Template</h1>
-      <p>Backend health status: {status}</p>
-    </>
+    <main>
+      <TodosPage />
+    </main>
   );
 }
 
-/** The todo page, shown when the `todo-ui` flag is on. */
+/** The todo page. */
 function TodosPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");

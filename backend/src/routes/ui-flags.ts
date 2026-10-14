@@ -1,16 +1,12 @@
 import { Router } from "express";
-import { isFeatureEnabled } from "../feature-flags";
-
-/** Feature flag gating the todo UI. */
-const TODO_UI = "todo-ui";
 
 /**
  * GET /api/ui-flags reports the UI flags this request may see, so the page can
- * decide what to render. Each flag is evaluated on the server for this request
- * via isFeatureEnabled(), so the Preview Token override applies uniformly.
+ * decide what to render. The todo UI flag that once gated the page has been
+ * retired, so it is now always reported on.
  */
 export const uiFlagsRouter = Router();
 
-uiFlagsRouter.get("/api/ui-flags", async (_req, res) => {
-  res.json({ [TODO_UI]: await isFeatureEnabled(res, TODO_UI) });
+uiFlagsRouter.get("/api/ui-flags", (_req, res) => {
+  res.json({ "todo-ui": true });
 });
