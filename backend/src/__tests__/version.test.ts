@@ -53,6 +53,19 @@ describe("GET /api/version", () => {
     expect(response.body).toEqual({ error: "not found" });
   });
 
+  // The live deployment sets PREVIEW_TOKEN, so an ordinary request — one
+  // that carries no token — must still stay dark while the flag is off. This
+  // is the exact "without the token" boundary: preview being configured must
+  // never widen access on its own.
+  it("stays 404 without a token even when PREVIEW_TOKEN is configured", async () => {
+    process.env.PREVIEW_TOKEN = TOKEN;
+
+    const response = await request(app).get("/api/version");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "not found" });
+  });
+
   it("shows the version to a Preview Token holder even while the flag is off", async () => {
     process.env.PREVIEW_TOKEN = TOKEN;
 
