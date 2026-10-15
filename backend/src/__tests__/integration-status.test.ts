@@ -144,4 +144,34 @@ describe("GET /api/integration-status", () => {
       delete process.env.PREVIEW_TOKEN;
     }
   });
+
+  // The Preview Token bypasses the flag gate but must not invent a key: with
+  // the flag off and the key unset or empty, a preview holder still gets the
+  // real per-request answer, configured:false. This pins the boundary a helper
+  // expecting configured:false against the deployed app (where the key is set)
+  // got wrong.
+  it.each([
+    ["unset", undefined],
+    ["empty", ""],
+  ])(
+    "reports configured:false to a Preview Token holder when the flag is off and the key is %s",
+    async (_label, value) => {
+      const TOKEN = "s3cret-preview-token";
+      process.env.PREVIEW_TOKEN = TOKEN;
+      if (value === undefined) {
+        delete process.env.THROWAWAY_TEST_KEY;
+      } else {
+        process.env.THROWAWAY_TEST_KEY = value;
+      }
+
+      try {
+        const response = await request(createApp()).get("/api/integration-status").set("X-Preview-Token", TOKEN);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ configured: false });
+      } finally {
+        delete process.env.PREVIEW_TOKEN;
+      }
+    },
+  );
 });
