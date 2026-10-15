@@ -13,6 +13,6 @@
   },
   {
     "slug": "integration-status",
-    "description": "ojones/ai-factory#111: GET /api/integration-status reports whether THROWAWAY_TEST_KEY is configured, without revealing its value; off answers 404 like an unknown route"
+    "description": "ojones/ai-factory#130: GET /api/integration-status reports whether THROWAWAY_TEST_KEY is configured, without revealing its value; off answers 404 like an unknown route"
   }
 ]
