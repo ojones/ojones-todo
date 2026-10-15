@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import { logger } from "./logger";
 import { healthRouter } from "./routes/health";
 import { heartbeatRouter } from "./routes/heartbeat";
+import { integrationStatusRouter } from "./routes/integration-status";
 import { todosRouter } from "./routes/todos";
 import { versionRouter } from "./routes/version";
 import { TodoStore } from "./todos";
@@ -80,6 +81,7 @@ export function createApp(): Express {
   app.use(todosRouter(new TodoStore()));
   app.use(heartbeatRouter);
   app.use(versionRouter);
+  app.use(integrationStatusRouter);
 
   // One container: the backend serves the built frontend's static assets
   // itself (STANDARDS-DEPLOYMENT.md) — no separate frontend server.
