@@ -36,6 +36,7 @@ describe("GET /api/heartbeat", () => {
     const response = await request(app).get("/api/heartbeat");
 
     expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "not found" });
   });
 
   it("returns 200 with the interval when the flag is on", async () => {
@@ -113,6 +114,7 @@ describe("GET /api/heartbeat/fast", () => {
     const response = await request(app).get("/api/heartbeat/fast");
 
     expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "not found" });
   });
 
   it("returns 200 with a 1 second interval when the flag is on", async () => {
