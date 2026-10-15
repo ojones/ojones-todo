@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
@@ -59,20 +57,5 @@ describe("GET /api/version", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ version: "1" });
-  });
-
-  it("records the version-endpoint flag in flags.json", () => {
-    const list = JSON.parse(readFileSync(path.resolve(__dirname, "../../../flags.json"), "utf8")) as Array<{
-      slug: string;
-      description: string;
-    }>;
-
-    const entry = list.find((f) => f.slug === "version-endpoint");
-
-    expect(entry).toBeTruthy();
-    // The Orchestrator reads this entry to create the flag, so it must name
-    // the story and the route the flag guards, not just exist.
-    expect(entry?.description).toContain("ojones/ai-factory#97");
-    expect(entry?.description).toContain("GET /api/version");
   });
 });

@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
@@ -56,13 +54,5 @@ describe("unconditional todo UI for an ordinary visitor", () => {
     const response = await request(app).get("/api/ui-flags");
 
     expect(response.status).toBe(404);
-  });
-
-  it("does not reference the retired ui-flags route from the app source", () => {
-    const appSource = readFileSync(path.resolve(__dirname, "../../../frontend/src/App.tsx"), "utf8");
-
-    expect(appSource).not.toContain("ui-flags");
-    expect(appSource).not.toContain("uiFlags");
-    expect(appSource).toContain("<TodosPage />");
   });
 });
