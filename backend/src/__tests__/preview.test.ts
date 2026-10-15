@@ -89,14 +89,16 @@ describe("Preview Token", () => {
 
   // The probe above is a test-only route. These drive a real, app-mounted,
   // flag-gated route (`GET /api/version`) that the deployment actually
-  // serves, so the preview override is proven on the shipped code path.
-  it("unlocks a real gated route for a token holder and keeps it dark without one", async () => {
+  // serves. Its endpoint stays dark for a Preview Token holder too: the flag
+  // alone decides when it goes live, so preview never widens it (the
+  // `version-dark` boundary).
+  it("keeps a real dark endpoint dark for a Preview Token holder", async () => {
     const dark = await request(createApp()).get("/api/version");
     expect(dark.status).toBe(404);
 
     const lit = await request(createApp()).get("/api/version").set("X-Preview-Token", TOKEN);
-    expect(lit.status).toBe(200);
-    expect(lit.body).toEqual({ version: "1" });
+    expect(lit.status).toBe(404);
+    expect(lit.body).toEqual({ error: "not found" });
 
     const wrong = await request(createApp()).get("/api/version").set("X-Preview-Token", "wrong-token");
     expect(wrong.status).toBe(404);

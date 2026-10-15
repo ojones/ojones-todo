@@ -66,12 +66,26 @@ describe("GET /api/version", () => {
     expect(response.body).toEqual({ error: "not found" });
   });
 
-  it("shows the version to a Preview Token holder even while the flag is off", async () => {
+  // The finding's `version-dark` case: with the flag off the endpoint must
+  // stay dark for every request, including one that carries the Preview
+  // Token. Letting the token widen it would make this request answer 200.
+  it("stays 404 for a Preview Token holder while the flag is off", async () => {
     process.env.PREVIEW_TOKEN = TOKEN;
 
     const response = await request(createApp()).get("/api/version").set("X-Preview-Token", TOKEN);
 
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ version: "1" });
+    expect(response.status).not.toBe(200);
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "not found" });
+  });
+
+  // A request carrying a wrong token is no better than one carrying none.
+  it("stays 404 for a wrong Preview Token while the flag is off", async () => {
+    process.env.PREVIEW_TOKEN = TOKEN;
+
+    const response = await request(createApp()).get("/api/version").set("X-Preview-Token", "not-the-token");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "not found" });
   });
 });

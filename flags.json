@@ -9,7 +9,7 @@
   },
   {
     "slug": "version-endpoint",
-    "description": "ojones/ai-factory#129: GET /api/version returns {\"version\": \"1\"}; off answers 404 like an unknown route"
+    "description": "ojones/ai-factory#129: GET /api/version returns {\"version\": \"1\"} when the flag is on; off answers 404 like an unknown route for every request, including one carrying the Preview Token, so the flag alone decides when the endpoint goes live"
   },
   {
     "slug": "integration-status",
