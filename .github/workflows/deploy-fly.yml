@@ -81,6 +81,7 @@ jobs:
         env:
           FACTORY_APP_SECRETS: declared
           # factory-secrets:begin
+          THROWAWAY_TEST_KEY: ${{ secrets.THROWAWAY_TEST_KEY }}
           # factory-secrets:end
         run: |
           names=$(jq -r '.secrets[]?.name' secrets.json)
