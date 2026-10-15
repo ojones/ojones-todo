@@ -35,8 +35,16 @@ afterEach(() => {
 });
 
 describe("GET /api/integration-status", () => {
-  it("returns 404 like an unknown route while the flag is off", async () => {
-    process.env.THROWAWAY_TEST_KEY = SECRET_VALUE;
+  it.each([
+    ["set", SECRET_VALUE],
+    ["empty", ""],
+    ["unset", undefined],
+  ])("returns 404 like an unknown route while the flag is off and the key is %s", async (_label, value) => {
+    if (value === undefined) {
+      delete process.env.THROWAWAY_TEST_KEY;
+    } else {
+      process.env.THROWAWAY_TEST_KEY = value;
+    }
 
     const response = await request(app).get("/api/integration-status");
 
