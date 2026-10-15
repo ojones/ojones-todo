@@ -74,6 +74,26 @@ describe("GET /api/integration-status", () => {
     expect(response.body).toEqual({ configured: false });
   });
 
+  it("reports the current value on each request as the key changes", async () => {
+    OpenFeature.setProvider(flags(true));
+    const instance = createApp();
+
+    process.env.THROWAWAY_TEST_KEY = SECRET_VALUE;
+    const set = await request(instance).get("/api/integration-status");
+    expect(set.status).toBe(200);
+    expect(set.body).toEqual({ configured: true });
+
+    delete process.env.THROWAWAY_TEST_KEY;
+    const unset = await request(instance).get("/api/integration-status");
+    expect(unset.status).toBe(200);
+    expect(unset.body).toEqual({ configured: false });
+
+    process.env.THROWAWAY_TEST_KEY = "";
+    const empty = await request(instance).get("/api/integration-status");
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual({ configured: false });
+  });
+
   it("never exposes the key value in the response body", async () => {
     OpenFeature.setProvider(flags(true));
     process.env.THROWAWAY_TEST_KEY = SECRET_VALUE;
