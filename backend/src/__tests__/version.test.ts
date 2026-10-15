@@ -43,9 +43,12 @@ describe("GET /api/version", () => {
     expect(response.body).toEqual({ version: "1" });
   });
 
-  it("returns 404 like an unknown route while the flag is off", async () => {
+  // AC-2: with the flag off the endpoint must be indistinguishable from an
+  // unknown route, and in particular must not answer 200.
+  it("returns 404, never 200, while the flag is off", async () => {
     const response = await request(app).get("/api/version");
 
+    expect(response.status).not.toBe(200);
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ error: "not found" });
   });

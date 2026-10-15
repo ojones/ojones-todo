@@ -9,7 +9,7 @@
   },
   {
     "slug": "version-endpoint",
-    "description": "ojones/ai-factory#97: GET /api/version returns {\"version\": \"1\"}; off answers 404 like an unknown route"
+    "description": "ojones/ai-factory#129: GET /api/version returns {\"version\": \"1\"}; off answers 404 like an unknown route"
   },
   {
     "slug": "integration-status",
