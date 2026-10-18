@@ -14,5 +14,9 @@
   {
     "slug": "integration-status",
     "description": "ojones/ai-factory#130: GET /api/integration-status reports whether THROWAWAY_TEST_KEY is configured, without revealing its value; off answers 404 like an unknown route"
+  },
+  {
+    "slug": "duplicate-check",
+    "description": "ojones/ai-factory#134: POST /api/todos/duplicate-check creates a todo for a new title (201) and answers 409 for a title that already exists; off answers 404 like an unknown route"
   }
 ]

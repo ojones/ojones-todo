@@ -61,6 +61,36 @@ describe("TodoStore.update", () => {
   });
 });
 
+describe("TodoStore.hasTitle", () => {
+  it("is false on an empty store", () => {
+    const store = new TodoStore();
+
+    expect(store.hasTitle("write tests")).toBe(false);
+  });
+
+  it("is true for a live todo with that exact title", () => {
+    const store = new TodoStore();
+    store.add("write tests");
+
+    expect(store.hasTitle("write tests")).toBe(true);
+  });
+
+  it("is false for a different title", () => {
+    const store = new TodoStore();
+    store.add("write tests");
+
+    expect(store.hasTitle("write test")).toBe(false);
+  });
+
+  it("is false for a soft-deleted title", () => {
+    const store = new TodoStore();
+    store.add("write tests");
+    store.delete(1);
+
+    expect(store.hasTitle("write tests")).toBe(false);
+  });
+});
+
 describe("TodoStore.delete", () => {
   it("returns true for a live todo and removes it from list()", () => {
     const store = new TodoStore();

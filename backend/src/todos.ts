@@ -51,6 +51,15 @@ export class TodoStore {
   }
 
   /**
+   * Whether a live (not soft-deleted) todo already has this exact title.
+   * Duplicate detection compares the title only; soft-deleted todos are
+   * excluded, matching what list() and the API consider to exist.
+   */
+  hasTitle(title: string): boolean {
+    return this.list().some((todo) => todo.title === title);
+  }
+
+  /**
    * Sets a todo's done status and returns the updated todo, or `null` when no
    * todo has that id. The lookup is an exact id match, so a non-integer or
    * unknown id finds nothing rather than updating the wrong todo.

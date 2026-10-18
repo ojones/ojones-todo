@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import type { TodoStore } from "../todos";
+import { isFeatureEnabled } from "../feature-flags";
 import { logger } from "../logger";
 
 /**
@@ -41,6 +42,34 @@ export function todosRouter(store: TodoStore): Router {
       res.status(400).json({ error: "title is required and must be a non-empty string" });
       return;
     }
+    res.status(201).json(store.add(title));
+  });
+
+  // POST /api/todos/duplicate-check ships dark behind the `duplicate-check`
+  // flag: until the Orchestrator releases it, an ordinary visitor gets the
+  // same 404 an unknown route returns. The request named both 201 and 409 as
+  // "required for every valid request", which cannot both hold for one call;
+  // the conservative reading is the standard duplicate-check contract — the
+  // first request for a title creates the todo and answers 201, and a later
+  // request with the same title answers 409. Nothing existing is changed:
+  // this only adds a new route. Detection compares the title only.
+  router.post("/api/todos/duplicate-check", async (req, res) => {
+    if (!(await isFeatureEnabled(res, "duplicate-check"))) {
+      res.status(404).json({ error: "not found" });
+      return;
+    }
+
+    const title = (req.body as { title?: unknown } | undefined)?.title;
+    if (typeof title !== "string" || title.trim() === "") {
+      res.status(400).json({ error: "title is required and must be a non-empty string" });
+      return;
+    }
+
+    if (store.hasTitle(title)) {
+      res.status(409).json({ error: "duplicate todo" });
+      return;
+    }
+
     res.status(201).json(store.add(title));
   });
 
