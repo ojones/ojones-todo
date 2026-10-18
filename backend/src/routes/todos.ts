@@ -53,25 +53,7 @@ export function todosRouter(store: TodoStore): Router {
   // first request for a title creates the todo and answers 201, and a later
   // request with the same title answers 409. Nothing existing is changed:
   // this only adds a new route. Detection compares the title only.
-  router.post("/api/todos/duplicate-check", async (req, res) => {
-    if (!(await isFeatureEnabled(res, "duplicate-check"))) {
-      res.status(404).json({ error: "not found" });
-      return;
-    }
-
-    const title = (req.body as { title?: unknown } | undefined)?.title;
-    if (typeof title !== "string" || title.trim() === "") {
-      res.status(400).json({ error: "title is required and must be a non-empty string" });
-      return;
-    }
-
-    if (store.hasTitle(title)) {
-      res.status(409).json({ error: "duplicate todo" });
-      return;
-    }
-
-    res.status(201).json(store.add(title));
-  });
+  router.post("/api/todos/duplicate-check", duplicateCheckHandler(store));
 
   // update-todo-store and patch-todo-endpoint are both retired: PUT and PATCH
   // are always available and have no feature-flag gate, so they work
@@ -101,6 +83,35 @@ export function todosRouter(store: TodoStore): Router {
   });
 
   return router;
+}
+
+/**
+ * POST /api/todos/duplicate-check. Gated in this one place by the
+ * `duplicate-check` flag, so with the flag off (and no Preview Token) it
+ * answers 404 exactly like an unknown route. With it on: a new title is
+ * created and returned with 201; a title that already exists on a live todo
+ * answers 409 and creates nothing; an invalid title answers 400.
+ */
+function duplicateCheckHandler(store: TodoStore): RequestHandler {
+  return async (req, res) => {
+    if (!(await isFeatureEnabled(res, "duplicate-check"))) {
+      res.status(404).json({ error: "not found" });
+      return;
+    }
+
+    const title = (req.body as { title?: unknown } | undefined)?.title;
+    if (typeof title !== "string" || title.trim() === "") {
+      res.status(400).json({ error: "title is required and must be a non-empty string" });
+      return;
+    }
+
+    if (store.hasTitle(title)) {
+      res.status(409).json({ error: "duplicate todo" });
+      return;
+    }
+
+    res.status(201).json(store.add(title));
+  };
 }
 
 /**
